@@ -8,11 +8,10 @@
 //
 struct tree_view_builder : public boost::default_dfs_visitor
 {
-    tree_view_builder(QTreeWidget* tree, std::size_t num_verts)
+    tree_view_builder(QTreeWidget* tree)
         : tree_(tree)
-    {
-        included_.resize(num_verts, false);
-    }
+        , current_(nullptr)
+    { }
 
     template <typename Vertex, typename Graph>
     void start_vertex(Vertex const& v, Graph const& g)
@@ -20,9 +19,8 @@ struct tree_view_builder : public boost::default_dfs_visitor
         std::string const& file = g[v];
         current_ = new QTreeWidgetItem(tree_);
         current_->setText(0, file.c_str());
-        current_->setText(1, QStringLiteral("?K"));
-        current_->setText(2, QStringLiteral("?K"));
-        current_->setCheckState(0, Qt::Checked);
+        size_stack_.push_back(0);
+        //current_->setCheckState(0, Qt::Checked);
     }
 
     template <typename Edge, typename Graph>
@@ -32,24 +30,36 @@ struct tree_view_builder : public boost::default_dfs_visitor
 
         QFileInfo finfo(file.c_str());
         qint64 this_size = finfo.size();
+
+        std::transform(
+            size_stack_.begin(),
+            size_stack_.end(),
+            size_stack_.begin(),
+            [this_size](qint64 v)
+            {
+                return v + this_size;
+            }
+        );
+
         size_stack_.push_back(this_size);
 
         current_ = new QTreeWidgetItem(current_);
         current_->setText(0, file.c_str());
-        current_->setCheckState(0, Qt::Checked);
-
-   }
+        //current_->setCheckState(0, Qt::Checked);
+    }
 
     template <typename Vertex, typename Graph>
     void finish_vertex(Vertex const&, Graph const&)
     {
+        std::string s = std::to_string(size_stack_.back());
+        current_->setText(1, s.c_str());
+        size_stack_.pop_back();
         current_ = current_->parent();
     }
 
     QTreeWidget* tree_;
     QTreeWidgetItem* current_;
     std::vector<qint64> size_stack_;
-    qint64 running_size_;
 };
 
 
@@ -58,10 +68,6 @@ Dialog::Dialog(QWidget *parent)
     , ui(new Ui::Dialog)
 {
     ui->setupUi(this);
-
-    cpp_dep::include_graph_t includes = cpp_dep::read_deps_file("C:/Users/Chris/src/local/cpp-size/test/includes-gcc.txt");
-    tree_view_builder build_tree(ui->include_hierarchy, boost::num_vertices(includes));
-    boost::depth_first_search(includes, boost::visitor(build_tree));
 }
 
 Dialog::~Dialog()
