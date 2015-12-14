@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>600</width>
+    <height>280</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>cpp-size</string>
+  </property>
+  <property name="sizeGripEnabled">
+   <bool>true</bool>
+  </property>
+  <widget class="QTreeWidget" name="include_hierarchy">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>581</width>
+     <height>261</height>
+    </rect>
+   </property>
+   <column>
+    <property name="text">
+     <string>Include</string>
+    </property>
+   </column>
+   <column>
+    <property name="text">
+     <string>Actual</string>
+    </property>
+   </column>
+   <column>
+    <property name="text">
+     <string>Max</string>
+    </property>
+   </column>
+  </widget>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>
