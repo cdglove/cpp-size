@@ -1,8 +1,28 @@
-#include "ui/dialog.h"
+// *****************************************************************************
+// 
+// ui/dialog.cpp
+//
+// Main dialog for cpp-size
+//
+// Copyright Chris Glover 2015
+//
+// Distributed under the Boost Software License, Version 1.0.
+// See accompanying file LICENSE_1_0.txt or copy at
+// http://www.boost.org/LICENSE_1_0.txt
+//
+// *****************************************************************************
+
+#include "ui/dialog.hpp"
 #include "ui_dialog.h"
 #include "cpp_dep/cpp_dep.hpp"
 #include <boost/graph/depth_first_search.hpp>
 #include <QFileInfo>
+#include <QDropEvent>
+#include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QDragMoveEvent>
+#include <QMimeData>
+#include <QMessageBox>
 
 // -----------------------------------------------------------------------------
 //
@@ -62,7 +82,8 @@ struct tree_view_builder : public boost::default_dfs_visitor
     std::vector<qint64> size_stack_;
 };
 
-
+// -----------------------------------------------------------------------------
+//
 Dialog::Dialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::Dialog)
@@ -73,4 +94,58 @@ Dialog::Dialog(QWidget *parent)
 Dialog::~Dialog()
 {
     delete ui;
+}
+
+// -----------------------------------------------------------------------------
+//
+void Dialog::dropEvent(QDropEvent* event)
+{
+    QMimeData const* mime_data = event->mimeData();
+    // check for our needed mime type, here a file or a list of files
+    if (mime_data->hasUrls())
+    {
+        QList<QUrl> urls = mime_data->urls();
+        if(urls.size() > 0)
+        {
+            // Just take the first one in case the user dragged multiple.
+            QString file = urls.at(0).toLocalFile();
+            try
+            {
+                cpp_dep::include_graph_t includes =
+                        cpp_dep::read_deps_file(file.toStdString().c_str());
+
+                ui->include_hierarchy->clear();
+                tree_view_builder build_tree(ui->include_hierarchy);
+                boost::depth_first_search(includes, boost::visitor(build_tree));
+            }
+            catch(std::exception& e)
+            {
+                QString msg;
+                msg += "Failed to load \"" + file + "\"\n"
+                     + "Error: " + e.what();
+                    
+                QMessageBox msg_box;
+                msg_box.setText(msg);
+                msg_box.setIcon(QMessageBox::Critical);
+                msg_box.exec();
+            }
+        }
+    }
+}
+
+void Dialog::dragEnterEvent(QDragEnterEvent* event)
+{
+     // if some actions should not be usable, like move, this code must be adopted
+     event->acceptProposedAction();
+}
+
+void Dialog::dragMoveEvent(QDragMoveEvent* event)
+{
+     // if some actions should not be usable, like move, this code must be adopted
+     event->acceptProposedAction();
+}
+
+void Dialog::dragLeaveEvent(QDragLeaveEvent* event)
+{
+     event->accept();
 }

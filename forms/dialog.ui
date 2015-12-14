@@ -10,6 +10,9 @@
     <height>280</height>
    </rect>
   </property>
+  <property name="acceptDrops">
+   <bool>true</bool>
+  </property>
   <property name="windowTitle">
    <string>cpp-size</string>
   </property>

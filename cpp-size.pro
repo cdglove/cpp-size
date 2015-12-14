@@ -14,14 +14,10 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
     ui/dialog.cpp \
-    ui/include_tree_item.cpp \
-    ui/include_tree_model.cpp \
     contrib/cpp_dep/cpp_dep.cpp
 
 HEADERS  += \
-	ui/dialog.h \
-    ui/include_tree_item.hpp \
-    ui/include_tree_model.hpp \
+	ui/dialog.hpp \
     contrib/cpp_dep/cpp_dep.hpp
 
 FORMS    += forms/dialog.ui

@@ -43,7 +43,7 @@ typedef boost::graph_traits<
 //   g++ -H -E -o /dev/null source.cpp 2> includes.txt
 // or from msvc as output from the command;
 //   cl.exe /showIncludes /P source.cpp 1> nul 2> includes.txt
-include_graph_t read_deps_file(std::string const& file);
+include_graph_t read_deps_file(char const* file);
 
 }
 

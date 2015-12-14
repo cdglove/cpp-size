@@ -1,4 +1,4 @@
-#include "ui/dialog.h"
+#include "ui/dialog.hpp"
 #include <QApplication>
 
 int main(int argc, char *argv[])

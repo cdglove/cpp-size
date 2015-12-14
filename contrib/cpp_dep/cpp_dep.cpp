@@ -54,7 +54,7 @@ static void ReadDepsFileRecursive(
     Iterator& current,
    	Iterator end)
 {
-	include_vertex_descriptor_t last_added;
+    include_vertex_descriptor_t last_added = include_vertex_descriptor_t();
 	std::string file;
 	while(current != end)
 	{
@@ -183,12 +183,12 @@ static include_graph_t ReadMsvcDepsFile(std::string const& deps)
 
 // -----------------------------------------------------------------------------
 //
-include_graph_t cpp_dep::read_deps_file(std::string const& file)
+include_graph_t cpp_dep::read_deps_file(char const* file)
 {
 	std::ifstream ins(file);
 	if(!ins.is_open())
 	{
-		throw std::runtime_error("Failed to open " + file + " for reading.");
+        throw std::runtime_error(std::string("Failed to open ") + file + " for reading.");
 	}
 
     std::stringstream sins;
