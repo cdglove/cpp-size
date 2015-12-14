@@ -22,6 +22,9 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QTreeWidget" name="include_hierarchy">
+     <property name="sortingEnabled">
+      <bool>true</bool>
+     </property>
      <column>
       <property name="text">
        <string>Include</string>
@@ -30,6 +33,11 @@
      <column>
       <property name="text">
        <string>Size</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Order</string>
       </property>
      </column>
     </widget>

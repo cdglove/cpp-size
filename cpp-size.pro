@@ -18,6 +18,7 @@ SOURCES += main.cpp\
 
 HEADERS  += \
 	ui/dialog.hpp \
+	ui/include_tree_widget_item.hpp \
     contrib/cpp_dep/cpp_dep.hpp
 
 FORMS    += forms/dialog.ui

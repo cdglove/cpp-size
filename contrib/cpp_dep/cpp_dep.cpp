@@ -101,17 +101,18 @@ static void ReadDepsFileRecursive(
                 continue;
 
 			auto vert = include_map.find(file);
-			if(vert == include_map.end())
+			if(true) //vert == include_map.end())
 			{
 				last_added = boost::add_vertex(file, deps);
-				vert = include_map.insert(std::make_pair(file, last_added)).first;	
+				vert = include_map.insert(std::make_pair(file, last_added)).first;
 			}
             else
             {
                 last_added = vert->second;
             }
 
-            boost::add_edge(parent, last_added, deps);
+            auto result = boost::add_edge(parent, last_added, deps);
+            BOOST_ASSERT(result.second);
 			++line_number;
 		}
 		else
