@@ -122,7 +122,7 @@ void Dialog::dropEvent(QDropEvent* event)
             {
                 QString msg;
                 msg += "Failed to load \"" + file + "\"\n"
-                     + "Error: " + e.what();
+                    +  "Error: " + e.what();
                     
                 QMessageBox msg_box;
                 msg_box.setText(msg);
