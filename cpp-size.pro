@@ -21,7 +21,7 @@ HEADERS  += \
 	ui/include_tree_widget_item.hpp \
     contrib/cpp_dep/cpp_dep.hpp
 
-FORMS    += forms/dialog.ui
+FORMS += forms/dialog.ui
 
 QMAKE_CXXFLAGS += -std=c++11
 

@@ -61,6 +61,11 @@ public:
         setText(ColSize, QString::number(size));
 	}
 
+    IncludeTreeWidgetItem* parent()
+    {
+        return static_cast<IncludeTreeWidgetItem*>(QTreeWidgetItem::parent());
+    }
+
 private:
 
     bool operator<(QTreeWidgetItem const& o) const override

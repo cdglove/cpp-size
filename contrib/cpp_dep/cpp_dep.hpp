@@ -24,7 +24,22 @@ namespace cpp_dep {
 
 // -----------------------------------------------------------------------------
 //
-typedef std::string include_vertex_t;
+struct include_vertex_t
+{
+    include_vertex_t()
+        : include_vertex_t("", 0)
+    {}
+
+    include_vertex_t(std::string name_, std::size_t size_)
+        : name(name_)
+        , size(size_)
+        , size_dependencies(0)
+    {}
+
+    std::string name;
+    std::size_t size;
+    std::size_t size_dependencies;
+};
 
 typedef boost::adjacency_list<
 	boost::vecS, 

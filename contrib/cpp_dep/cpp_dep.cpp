@@ -14,15 +14,19 @@
 #include "cpp_dep/cpp_dep.hpp"
 #include <fstream>
 #include <boost/graph/topological_sort.hpp>
-#include <boost/unordered/unordered_map.hpp>
 #include <boost/graph/breadth_first_search.hpp>
 
-using namespace cpp_dep;
+// -----------------------------------------------------------------------------
+//
+namespace cpp_dep
+{
+	// To be supplied by the application;
+    extern std::size_t get_file_size(char const* path);
+}
 
-typedef boost::unordered::unordered_map<
-	std::string, 
-	include_vertex_descriptor_t
-> include_map_t;
+// -----------------------------------------------------------------------------
+//
+using namespace cpp_dep;
 
 template<typename Iterator>
 Iterator getline(Iterator cur, Iterator end, std::string& line)
@@ -46,16 +50,17 @@ template<typename Iterator>
 static void ReadDepsFileRecursive(
     char const* line_prefix,
     char depth_mark,
-	include_graph_t& deps,
     include_vertex_descriptor_t parent,
-	include_map_t& include_map,
 	int depth, 
+    include_graph_t& deps,
 	int& line_number, 
+    std::size_t& size,
     Iterator& current,
    	Iterator end)
 {
     include_vertex_descriptor_t last_added = include_vertex_descriptor_t();
 	std::string file;
+    std::size_t sub_tree_size = 0;
 	while(current != end)
 	{
 		int line_depth = 0;
@@ -80,7 +85,7 @@ static void ReadDepsFileRecursive(
 		if(line_depth <= depth)
 		{
             current = line_start_pos;
-			return;
+            break;
 		}
 
 		if(line_depth == (depth + 1))
@@ -100,17 +105,9 @@ static void ReadDepsFileRecursive(
             if(file.empty())
                 continue;
 
-			auto vert = include_map.find(file);
-			if(true) //vert == include_map.end())
-			{
-				last_added = boost::add_vertex(file, deps);
-				vert = include_map.insert(std::make_pair(file, last_added)).first;
-			}
-            else
-            {
-                last_added = vert->second;
-            }
-
+            std::size_t this_size = get_file_size(file.c_str());
+            sub_tree_size += this_size;
+            last_added = boost::add_vertex(include_vertex_t(file, this_size), deps);
             auto result = boost::add_edge(parent, last_added, deps);
             BOOST_ASSERT(result.second);
 			++line_number;
@@ -121,15 +118,18 @@ static void ReadDepsFileRecursive(
             ReadDepsFileRecursive(
                 line_prefix,
                 depth_mark,
-                deps,
                 last_added,
-                include_map,
                 depth+1,
+                deps,
                 line_number,
+                sub_tree_size,
                 current,
                 end);
 		}
 	}
+
+    size += sub_tree_size;
+    deps[parent].size_dependencies = sub_tree_size;
 }
 
 // -----------------------------------------------------------------------------
@@ -137,19 +137,19 @@ static void ReadDepsFileRecursive(
 static include_graph_t ReadGccDepsFile(std::string const& deps)
 {
     include_graph_t dep_graph;
-    include_vertex_descriptor_t root = add_vertex("", dep_graph);
-    include_map_t include_map;
+    include_vertex_descriptor_t root = add_vertex(include_vertex_t(), dep_graph);
     int line_number = 0;
+    std::size_t tree_size;
     auto begin = deps.begin();
     auto end = deps.end();
     ReadDepsFileRecursive(
         "",
         '.',
-        dep_graph,
         root,
-        include_map,
         0,
+        dep_graph,
         line_number,
+        tree_size,
         begin,
         end
     );
@@ -162,19 +162,19 @@ static include_graph_t ReadGccDepsFile(std::string const& deps)
 static include_graph_t ReadMsvcDepsFile(std::string const& deps)
 {
 	include_graph_t dep_graph;
-	include_vertex_descriptor_t root = add_vertex("", dep_graph);
-	include_map_t include_map;
+    include_vertex_descriptor_t root = add_vertex(include_vertex_t(), dep_graph);
 	int line_number = 0;
+    std::size_t tree_size;
     auto begin = deps.begin();
     auto end = deps.end();
     ReadDepsFileRecursive(
         "Note: including file:",
         ' ',
-        dep_graph,
         root,
-        include_map,
         0,
+        dep_graph,
         line_number,
+        tree_size,
         begin,
         end
     );

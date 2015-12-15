@@ -1,0 +1,9 @@
+Microsoft (R) C/C++ Optimizing Compiler Version 19.00.23026 for x64
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+boost-spirit.cpp
+Note: including file: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE\string
+Note: including file:  C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE\istream
+Note: including file:   C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE\ostream
+Note: including file: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE\vector
+Note: including file:  C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\INCLUDE\xmemory

@@ -26,6 +26,18 @@
 
 // -----------------------------------------------------------------------------
 //
+namespace cpp_dep
+{
+    // To be supplied by the application;
+    std::size_t get_file_size(char const* path)
+    {
+        QFileInfo finfo(path);
+        return finfo.size();
+    }
+}
+
+// -----------------------------------------------------------------------------
+//
 struct tree_view_builder : public boost::default_dfs_visitor
 {
     tree_view_builder(QTreeWidget* tree)
@@ -37,9 +49,11 @@ struct tree_view_builder : public boost::default_dfs_visitor
     template <typename Vertex, typename Graph>
     void start_vertex(Vertex const& v, Graph const& g)
     {
-        std::string const& file = g[v];
+        cpp_dep::include_vertex_t const& file = g[v];
+
         current_item_ = new IncludeTreeWidgetItem(tree_);
-        current_item_->setColumnFile(file.c_str());
+        current_item_->setColumnFile(file.name.c_str());
+        current_item_->setColumnSize(file.size + file.size_dependencies);
         current_item_->setColumnOrder(0);
         size_stack_.push_back(0);
     }
@@ -47,37 +61,19 @@ struct tree_view_builder : public boost::default_dfs_visitor
     template <typename Edge, typename Graph>
     void examine_edge(Edge const& e, Graph const& g)
     {
-        std::string const& source = g[e.m_source];
-        std::string const& file = g[e.m_target];
-
-        QFileInfo finfo(file.c_str());
-        qint64 this_size = finfo.size();
-
-        std::transform(
-            size_stack_.begin(),
-            size_stack_.end(),
-            size_stack_.begin(),
-            [this_size](qint64 v)
-            {
-                return v + this_size;
-            }
-        );
-
-        size_stack_.push_back(this_size);
+        cpp_dep::include_vertex_t const& source = g[e.m_source];
+        cpp_dep::include_vertex_t const& file = g[e.m_target];
 
         current_item_ = new IncludeTreeWidgetItem(current_item_);
-        current_item_->setColumnFile(finfo.absoluteFilePath());
+        current_item_->setColumnFile(file.name.c_str());
+        current_item_->setColumnSize(file.size + file.size_dependencies);
         current_item_->setColumnOrder(current_order_++);
     }
 
     template <typename Vertex, typename Graph>
-    void finish_vertex(Vertex const& v, Graph const& g)
+    void finish_vertex(Vertex const&, Graph const&)
     {
-        std::string const& file = g[v];
-        current_item_->setColumnSize(size_stack_.back());
-        
-        size_stack_.pop_back();
-        current_item_ = static_cast<IncludeTreeWidgetItem*>(current_item_->parent());
+        current_item_ = current_item_->parent();
     }
 
     QTreeWidget* tree_;
