@@ -27,7 +27,9 @@ namespace cpp_dep {
 struct include_vertex_t
 {
     include_vertex_t()
-        : include_vertex_t("", 0)
+        : name("")
+        , size(0)
+        , size_dependencies(0)
     {}
 
     include_vertex_t(std::string name_, std::size_t size_)
