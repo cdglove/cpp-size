@@ -23,7 +23,6 @@
 #include <QDragMoveEvent>
 #include <QMimeData>
 #include <QMessageBox>
-#include <boost/unordered/unordered_map.hpp>
 
 // -----------------------------------------------------------------------------
 //
@@ -103,12 +102,24 @@ void Dialog::dropEvent(QDropEvent* event)
                 cpp_dep::include_graph_t includes =
                     cpp_dep::read_deps_file(file.toStdString().c_str());
 
+                // Populate the include tree
+                {
+                    ui->include_tree->clear();
+                    tree_view_builder build_tree(ui->include_tree);
+                    boost::depth_first_search(
+                        includes, boost::visitor(build_tree));
+                }
+
                 cpp_dep::include_graph_t inverted =
                     cpp_dep::invert_to_paths(includes);
 
-                ui->include_hierarchy->clear();
-                tree_view_builder build_tree(ui->include_hierarchy);
-                boost::depth_first_search(inverted, boost::visitor(build_tree));
+                // Populate the filesystem tree
+                {
+                    ui->filesystem_tree->clear();
+                    tree_view_builder build_tree(ui->filesystem_tree);
+                    boost::depth_first_search(
+                        inverted, boost::visitor(build_tree));
+                }
             }
             catch(std::exception& e)
             {

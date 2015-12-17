@@ -15,15 +15,14 @@
 #include <fstream>
 #include <boost/graph/topological_sort.hpp>
 #include <boost/graph/breadth_first_search.hpp>
+#include <boost/unordered/unordered_set.hpp>
 #include <boost/filesystem.hpp>
 
 // -----------------------------------------------------------------------------
 //
-namespace cpp_dep
-{
-	// To be supplied by the application;
-    extern std::size_t get_file_size(char const* path);
-}
+typedef boost::unordered::unordered_set<
+    std::string
+> known_file_set_t;
 
 // -----------------------------------------------------------------------------
 //
@@ -54,6 +53,7 @@ static void ReadDepsFileRecursive(
     include_vertex_descriptor_t parent,
 	int depth, 
     include_graph_t& deps,
+    known_file_set_t& known_files,
 	int& line_number, 
     std::size_t& size,
     Iterator& current,
@@ -96,17 +96,30 @@ static void ReadDepsFileRecursive(
                 ++current;
 
             current = getline(current, end, file);
-			std::replace(
-				file.begin(),
-				file.end(),
-				'\\',
-				'/'
-			);
+            std::transform(
+                file.begin(),
+                file.end(),
+                file.begin(),
+                [](char c)
+                {
+                    if(c == '\\' || c == '/')
+                        return (char)boost::filesystem::path::preferred_separator;
+                    else
+                        return (char)std::tolower(c);
+                }
+            );
 
             if(file.empty())
                 continue;
 
-            std::size_t this_size = boost::filesystem::file_size(file.c_str());
+            std::size_t this_size = 0;
+            auto known_it = known_files.find(file);
+            if(known_it == known_files.end())
+            {
+                this_size += boost::filesystem::file_size(file.c_str());
+                known_files.insert(file);
+            }
+
             sub_tree_size += this_size;
             last_added = boost::add_vertex(include_vertex_t(file, this_size), deps);
             auto result = boost::add_edge(parent, last_added, deps);
@@ -122,6 +135,7 @@ static void ReadDepsFileRecursive(
                 last_added,
                 depth+1,
                 deps,
+                known_files,
                 line_number,
                 sub_tree_size,
                 current,
@@ -139,6 +153,7 @@ static include_graph_t ReadGccDepsFile(std::string const& deps)
 {
     include_graph_t dep_graph;
     include_vertex_descriptor_t root = add_vertex(include_vertex_t(), dep_graph);
+    known_file_set_t known_files;
     int line_number = 0;
     std::size_t tree_size;
     auto begin = deps.begin();
@@ -149,6 +164,7 @@ static include_graph_t ReadGccDepsFile(std::string const& deps)
         root,
         0,
         dep_graph,
+        known_files,
         line_number,
         tree_size,
         begin,
@@ -164,6 +180,7 @@ static include_graph_t ReadMsvcDepsFile(std::string const& deps)
 {
 	include_graph_t dep_graph;
     include_vertex_descriptor_t root = add_vertex(include_vertex_t(), dep_graph);
+    known_file_set_t known_files;
 	int line_number = 0;
     std::size_t tree_size;
     auto begin = deps.begin();
@@ -174,6 +191,7 @@ static include_graph_t ReadMsvcDepsFile(std::string const& deps)
         root,
         0,
         dep_graph,
+        known_files,
         line_number,
         tree_size,
         begin,
@@ -208,66 +226,56 @@ include_graph_t cpp_dep::read_deps_file(char const* file)
 
 // -----------------------------------------------------------------------------
 //
-struct to_path_inverter : public boost::default_dfs_visitor
+include_graph_t cpp_dep::invert_to_paths(include_graph_t const& g)
 {
-    to_path_inverter(include_graph_t& result)
-        : result_(result)
-    {}
+    include_graph_t result;
+    boost::graph_traits<
+        include_graph_t
+    >::vertex_iterator vi, vi_end;
 
-    template <typename Vertex, typename Graph>
-    void start_vertex(Vertex const& v, Graph const& g)
+    boost::unordered::unordered_map<
+        std::string,
+        include_vertex_descriptor_t
+    > partial_path_map;
+
+    boost::tie(vi, vi_end) = boost::vertices(g);
+    auto root_vi = vi;
+
+    // Skip the first item
+    if(vi != vi_end)
+        ++vi;
+
+    for ( ; vi != vi_end; ++vi)
     {
-        include_vertex_t const& root = g[v];
-        root_vert_ = boost::add_vertex(
-            include_vertex_t(root.name, 0), result_);
+        include_vertex_t const& file = g[*vi];
+        boost::filesystem::path file_path(file.name);
+        boost::filesystem::path partial_path;
+        std::string partial_path_string;
+        include_vertex_descriptor_t last_vert = *root_vi;
 
-        partial_path_map_.insert(std::make_pair(root.name, root_vert_));
-    }
-
-    template <typename Edge, typename Graph>
-    void examine_edge(Edge const& e, Graph const& g)
-    {
-        include_vertex_t const& file = g[e.m_target];
-        boost::filesystem::path p(file.name);
-        std::string p_as_string;
-        include_vertex_descriptor_t last_vert = root_vert_;
-        for(auto&& c : p)
+        for(auto&& component : file_path)
         {
-            p_as_string = c.string();
-            auto i = partial_path_map_.find(p_as_string);
+            partial_path /= component;
+            partial_path_string = partial_path.string();
+            auto i = partial_path_map.find(partial_path_string);
             auto vert = include_vertex_descriptor_t();
-            if(i != partial_path_map_.end())
+            if(i != partial_path_map.end())
             {
                 vert = i->second;
             }
             else
             {
-                vert = boost::add_vertex(include_vertex_t(p_as_string, 0), result_);
-                partial_path_map_.insert(std::make_pair(p_as_string, vert));
+                vert = boost::add_vertex(include_vertex_t(partial_path_string, 0), result);
+                partial_path_map.insert(std::make_pair(partial_path_string, vert));
+                boost::add_edge(last_vert, vert, result);
             }
 
-            boost::add_edge(last_vert, vert, result_);
+            include_vertex_t& result_vert = result[vert];
+            result_vert.size += file.size;
             last_vert = vert;
         }
     }
 
-    boost::unordered::unordered_map<
-        std::string,
-        include_vertex_descriptor_t
-    > partial_path_map_;
-
-    include_vertex_descriptor_t root_vert_;
-
-    include_graph_t& result_;
-};
-
-// -----------------------------------------------------------------------------
-//
-include_graph_t cpp_dep::invert_to_paths(include_graph_t const& g)
-{
-    include_graph_t result;
-    to_path_inverter inverter(result);
-    boost::depth_first_search(g, boost::visitor(inverter));
     return result;
 }
 
