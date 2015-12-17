@@ -23,18 +23,7 @@
 #include <QDragMoveEvent>
 #include <QMimeData>
 #include <QMessageBox>
-
-// -----------------------------------------------------------------------------
-//
-namespace cpp_dep
-{
-    // To be supplied by the application;
-    std::size_t get_file_size(char const* path)
-    {
-        QFileInfo finfo(path);
-        return finfo.size();
-    }
-}
+#include <boost/unordered/unordered_map.hpp>
 
 // -----------------------------------------------------------------------------
 //
@@ -114,9 +103,12 @@ void Dialog::dropEvent(QDropEvent* event)
                 cpp_dep::include_graph_t includes =
                     cpp_dep::read_deps_file(file.toStdString().c_str());
 
+                cpp_dep::include_graph_t inverted =
+                    cpp_dep::invert_to_paths(includes);
+
                 ui->include_hierarchy->clear();
                 tree_view_builder build_tree(ui->include_hierarchy);
-                boost::depth_first_search(includes, boost::visitor(build_tree));
+                boost::depth_first_search(inverted, boost::visitor(build_tree));
             }
             catch(std::exception& e)
             {

@@ -26,7 +26,10 @@ set(CMAKE_AUTOMOC ON)
 #set(CMAKE_AUTOUIC ON)
 
 find_package(Qt5Widgets)
-find_package(Boost)
+find_package(
+	Boost REQUIRED
+	system
+	filesystem)
 
 set(CMAKE_CXX_STANDARD 14)
 file(GLOB_RECURSE PROJECT_SOURCES src/*.cpp contrib/*.cpp)

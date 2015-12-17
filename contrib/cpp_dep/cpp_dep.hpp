@@ -60,6 +60,12 @@ typedef boost::graph_traits<
 //   cl.exe /showIncludes /P source.cpp 1> nul 2> includes.txt
 include_graph_t read_deps_file(char const* file);
 
+// -----------------------------------------------------------------------------
+// Inverts the include graph such that it decends by file system
+// component. Ie: the root becomes to most common path, ie
+//   /home/user/src/project
+// followed by the next, etc.
+include_graph_t invert_to_paths(include_graph_t const& g);
 }
 
 #endif // _CPPDEP_CPPDEP_HPP_
