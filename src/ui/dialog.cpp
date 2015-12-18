@@ -39,11 +39,12 @@ struct tree_view_builder : public boost::default_dfs_visitor
     {
         cpp_dep::include_vertex_t const& file = g[v];
 
+        total_size_ = file.size + file.size_dependencies;
+
         current_item_ = new IncludeTreeWidgetItem(tree_);
         current_item_->setColumnFile(file.name.c_str());
-        current_item_->setColumnSize(file.size + file.size_dependencies);
+        current_item_->setColumnSize(total_size_, total_size_);
         current_item_->setColumnOrder(0);
-        size_stack_.push_back(0);
     }
 
     template <typename Edge, typename Graph>
@@ -54,7 +55,7 @@ struct tree_view_builder : public boost::default_dfs_visitor
 
         current_item_ = new IncludeTreeWidgetItem(current_item_);
         current_item_->setColumnFile(file.name.c_str());
-        current_item_->setColumnSize(file.size + file.size_dependencies);
+        current_item_->setColumnSize(file.size + file.size_dependencies, total_size_);
         current_item_->setColumnOrder(current_order_++);
     }
 
@@ -67,7 +68,7 @@ struct tree_view_builder : public boost::default_dfs_visitor
     QTreeWidget* tree_;
     IncludeTreeWidgetItem* current_item_;
     int current_order_;
-    std::vector<qint64> size_stack_;
+    std::size_t total_size_;
 };
 
 // -----------------------------------------------------------------------------
@@ -77,6 +78,8 @@ Dialog::Dialog(QWidget *parent)
     , ui(new Ui::Dialog)
 {
     ui->setupUi(this);
+    ui->filesystem_tree->header()->resizeSection(0, 400);
+    ui->include_tree->header()->resizeSection(0, 400);
 }
 
 Dialog::~Dialog()

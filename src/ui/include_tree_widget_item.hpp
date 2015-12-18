@@ -25,18 +25,21 @@ private:
 
 	enum Col
 	{
-	    ColFile,
-	    ColSize,
-	    ColOrder,
+        ColFile,
+        ColSize,
+        ColPercent,
+        ColOrder,
 	};
 
 public:
 
 	IncludeTreeWidgetItem(QTreeWidget* parent)
-		: QTreeWidgetItem(parent)
+        : QTreeWidgetItem(parent)
         , size_(0)
         , order_(0)
-	{}
+    {
+        init();
+    }
 
     IncludeTreeWidgetItem(IncludeTreeWidgetItem* parent)
         : QTreeWidgetItem(parent)
@@ -53,12 +56,16 @@ public:
 	{
         order_ = order;
         setText(ColOrder, QString::number(order));
+        setTextAlignment(ColOrder, Qt::AlignRight);
 	}
 
-	void setColumnSize(qint64 size)
+    void setColumnSize(qint64 size, qint64 total_size)
 	{
         size_ = size;
-        setText(ColSize, QString::number(size));
+        setText(ColSize, QString::number((size+1023)/1024) + "kb");
+        setText(ColPercent, QString::number((size * 100) / total_size) + "%");
+        setTextAlignment(ColSize, Qt::AlignRight);
+        setTextAlignment(ColPercent, Qt::AlignRight);
 	}
 
     IncludeTreeWidgetItem* parent()
@@ -67,6 +74,13 @@ public:
     }
 
 private:
+
+    void init()
+    {
+        setTextAlignment(ColSize, Qt::AlignRight);
+        setTextAlignment(ColPercent, Qt::AlignRight);
+        setTextAlignment(ColOrder, Qt::AlignRight);
+    }
 
     bool operator<(QTreeWidgetItem const& o) const override
     {
@@ -79,6 +93,7 @@ private:
             return text(ColFile) < other.text(ColFile);
 			break;
 		case ColSize:
+        case ColPercent:
 			return size_ < other.size_;
 		case ColOrder:
 			return order_ < other.order_;

@@ -35,6 +35,15 @@
          <property name="sortingEnabled">
           <bool>true</bool>
          </property>
+         <attribute name="headerCascadingSectionResizes">
+          <bool>false</bool>
+         </attribute>
+         <attribute name="headerDefaultSectionSize">
+          <number>75</number>
+         </attribute>
+         <attribute name="headerStretchLastSection">
+          <bool>false</bool>
+         </attribute>
          <column>
           <property name="text">
            <string>File</string>
@@ -44,10 +53,24 @@
           <property name="text">
            <string>Size</string>
           </property>
+          <property name="textAlignment">
+           <set>AlignVCenter</set>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Percent</string>
+          </property>
+          <property name="textAlignment">
+           <set>AlignVCenter</set>
+          </property>
          </column>
          <column>
           <property name="text">
            <string>Order</string>
+          </property>
+          <property name="textAlignment">
+           <set>AlignVCenter</set>
           </property>
          </column>
         </widget>
@@ -64,6 +87,15 @@
          <property name="sortingEnabled">
           <bool>true</bool>
          </property>
+         <attribute name="headerCascadingSectionResizes">
+          <bool>false</bool>
+         </attribute>
+         <attribute name="headerDefaultSectionSize">
+          <number>75</number>
+         </attribute>
+         <attribute name="headerStretchLastSection">
+          <bool>false</bool>
+         </attribute>
          <column>
           <property name="text">
            <string>Path</string>
@@ -73,10 +105,24 @@
           <property name="text">
            <string>Size</string>
           </property>
+          <property name="textAlignment">
+           <set>AlignVCenter</set>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Percent</string>
+          </property>
+          <property name="textAlignment">
+           <set>AlignVCenter</set>
+          </property>
          </column>
          <column>
           <property name="text">
            <string>Order</string>
+          </property>
+          <property name="textAlignment">
+           <set>AlignVCenter</set>
           </property>
          </column>
         </widget>
