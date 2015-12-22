@@ -27,6 +27,7 @@
 #include <QDragMoveEvent>
 #include <QMimeData>
 #include <QMessageBox>
+#include <QtConcurrent/QtConcurrent>
 #include <algorithm>
 
 // -----------------------------------------------------------------------------
@@ -38,6 +39,8 @@ Dialog::Dialog(QWidget *parent)
     ui->setupUi(this);
     ui->filesystem_tree->header()->resizeSection(0, 400);
     ui->include_tree->header()->resizeSection(0, 400);
+
+    connect(&filtered_tree_watcher_, SIGNAL(finished()), this, SLOT(onTreeFiltered()));
 }
 
 Dialog::~Dialog()
@@ -49,62 +52,69 @@ Dialog::~Dialog()
 //
 void Dialog::filterTextChanged(QString const& filter_text)
 {
-    std::vector<std::string> match_list;
-    std::string filter_text_std = filter_text.toStdString();
-    boost::algorithm::split(
-        match_list, filter_text_std,
-        boost::algorithm::is_any_of(" \0\t\r"),
-        boost::algorithm::token_compress_on);
-
-    match_list.erase(
-        std::remove_if(
-            match_list.begin(),
-            match_list.end(),
-            [](std::string const& s)
-            {
-                return s.empty();
-            }
-        ),
-        match_list.end()
-    );
-
-    ui->include_tree->clear();
-
-    if(match_list.empty())
+    auto do_filter = [filter_text, this]()
     {
-        tree_view_builder build_tree(ui->include_tree);
-        boost::depth_first_search(
-            *include_graph_, boost::visitor(build_tree));
-    }
-    else
-    {
-        auto match_all_substrings = [&match_list](
-            cpp_dep::include_vertex_descriptor_t const& v,
-            cpp_dep::include_graph_t const& g)
-        {
-            cpp_dep::include_vertex_t const& file = g[v];
-            return std::all_of(
+        std::unique_ptr<QTreeWidget> tree(new QTreeWidget);
+        std::vector<std::string> match_list;
+        std::string filter_text_std = filter_text.toStdString();
+        boost::algorithm::split(
+            match_list, filter_text_std,
+            boost::algorithm::is_any_of(" \0\t\r"),
+            boost::algorithm::token_compress_on);
+
+        match_list.erase(
+            std::remove_if(
                 match_list.begin(),
                 match_list.end(),
-                [&file](std::string const& sub_str)
+                [](std::string const& s)
                 {
-                    return file.name.find(sub_str) != std::string::npos;
+                    return s.empty();
                 }
-            );
-        };
+            ),
+            match_list.end()
+        );
 
-        cpp_dep::include_graph_t result_graph;
-        filtered_subgraph_builder<
-            cpp_dep::include_graph_t
-        >graph_filter(match_all_substrings, result_graph);
+        if(match_list.empty())
+        {
+            tree_view_builder build_tree(tree.get());
+            boost::depth_first_search(
+                *include_graph_, boost::visitor(build_tree));
+        }
+        else
+        {
+            auto match_all_substrings = [&match_list](
+                cpp_dep::include_vertex_descriptor_t const& v,
+                cpp_dep::include_graph_t const& g)
+            {
+                cpp_dep::include_vertex_t const& file = g[v];
+                return std::all_of(
+                    match_list.begin(),
+                    match_list.end(),
+                    [&file](std::string const& sub_str)
+                    {
+                        return file.name.find(sub_str) != std::string::npos;
+                    }
+                );
+            };
 
-        boost::depth_first_search(
-            *include_graph_, boost::visitor(graph_filter));
+            cpp_dep::include_graph_t result_graph;
+            filtered_subgraph_builder<
+                cpp_dep::include_graph_t
+            >graph_filter(match_all_substrings, result_graph);
 
-        tree_view_builder build_tree(ui->include_tree);
-        boost::depth_first_search(
-            result_graph, boost::visitor(build_tree));
-    }
+            boost::depth_first_search(
+                *include_graph_, boost::visitor(graph_filter));
+
+            tree_view_builder build_tree(tree.get());
+            boost::depth_first_search(
+                result_graph, boost::visitor(build_tree));
+        }
+
+        return tree.release();
+    };
+
+    QFuture<QTreeWidget*> f = QtConcurrent::run(do_filter);
+    filtered_tree_watcher_.setFuture(f);
 }
 
 // -----------------------------------------------------------------------------
@@ -199,4 +209,13 @@ void Dialog::populateTrees()
         boost::depth_first_search(
             *filesystem_graph_, boost::visitor(build_tree));
     }
+}
+
+// -----------------------------------------------------------------------------
+//
+void Dialog::onTreeFiltered()
+{
+    QFuture<QTreeWidget*> new_tree = filtered_tree_watcher_.future();
+    delete ui->include_tree;
+    ui->include_tree = new_tree.result();
 }

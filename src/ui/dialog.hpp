@@ -15,6 +15,7 @@
 #define _UI_DIALOG_HPP_
 
 #include <QDialog>
+#include <QFutureWatcher>
 #include <memory>
 
 // -----------------------------------------------------------------------------
@@ -22,6 +23,8 @@
 namespace Ui {
 class Dialog;
 }
+
+class QTreeWidget;
 
 // -----------------------------------------------------------------------------
 //
@@ -55,10 +58,15 @@ private:
     // -------------------------------------------------------------------------
     // private helpers.
     void populateTrees();
+    void onTreeFiltered();
 
     Ui::Dialog *ui;
     std::unique_ptr<cpp_dep::include_graph_t> include_graph_;
     std::unique_ptr<cpp_dep::include_graph_t> filesystem_graph_;
+
+    // Forced to use a raw ptr here because QFuture doesn't support
+    // move only types and shared_ptr doesn't have a release function.
+    QFutureWatcher<QTreeWidget*> filtered_tree_watcher_;
 };
 
 #endif // _UI_DIALOG_H_
