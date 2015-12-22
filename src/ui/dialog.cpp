@@ -1,5 +1,5 @@
 // *****************************************************************************
-// 
+//
 // ui/dialog.cpp
 //
 // Main dialog for cpp-size
@@ -13,9 +13,13 @@
 // *****************************************************************************
 #include "ui/dialog.hpp"
 #include "ui/include_tree_widget_item.hpp"
+#include "ui/tree_view_builder.hpp"
+#include "util/filtered_subgraph_builder.hpp"
 #include "ui_dialog.h"
 #include "cpp_dep/cpp_dep.hpp"
 #include <boost/graph/depth_first_search.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 #include <QFileInfo>
 #include <QDropEvent>
 #include <QDragEnterEvent>
@@ -23,53 +27,7 @@
 #include <QDragMoveEvent>
 #include <QMimeData>
 #include <QMessageBox>
-
-// -----------------------------------------------------------------------------
-//
-struct tree_view_builder : public boost::default_dfs_visitor
-{
-    tree_view_builder(QTreeWidget* tree)
-        : tree_(tree)
-        , current_item_(nullptr)
-        , current_order_(1)
-    { }
-
-    template <typename Vertex, typename Graph>
-    void start_vertex(Vertex const& v, Graph const& g)
-    {
-        cpp_dep::include_vertex_t const& file = g[v];
-
-        total_size_ = file.size + file.size_dependencies;
-
-        current_item_ = new IncludeTreeWidgetItem(tree_);
-        current_item_->setColumnFile(file.name.c_str());
-        current_item_->setColumnSize(total_size_, total_size_);
-        current_item_->setColumnOrder(0);
-    }
-
-    template <typename Edge, typename Graph>
-    void examine_edge(Edge const& e, Graph const& g)
-    {
-        cpp_dep::include_vertex_t const& source = g[e.m_source];
-        cpp_dep::include_vertex_t const& file = g[e.m_target];
-
-        current_item_ = new IncludeTreeWidgetItem(current_item_);
-        current_item_->setColumnFile(file.name.c_str());
-        current_item_->setColumnSize(file.size + file.size_dependencies, total_size_);
-        current_item_->setColumnOrder(current_order_++);
-    }
-
-    template <typename Vertex, typename Graph>
-    void finish_vertex(Vertex const&, Graph const&)
-    {
-        current_item_ = current_item_->parent();
-    }
-
-    QTreeWidget* tree_;
-    IncludeTreeWidgetItem* current_item_;
-    int current_order_;
-    std::size_t total_size_;
-};
+#include <algorithm>
 
 // -----------------------------------------------------------------------------
 //
@@ -85,6 +43,68 @@ Dialog::Dialog(QWidget *parent)
 Dialog::~Dialog()
 {
     delete ui;
+}
+
+// -----------------------------------------------------------------------------
+//
+void Dialog::filterTextChanged(QString const& filter_text)
+{
+    std::vector<std::string> match_list;
+    std::string filter_text_std = filter_text.toStdString();
+    boost::algorithm::split(
+        match_list, filter_text_std,
+        boost::algorithm::is_any_of(" \0\t\r"),
+        boost::algorithm::token_compress_on);
+
+    match_list.erase(
+        std::remove_if(
+            match_list.begin(),
+            match_list.end(),
+            [](std::string const& s)
+            {
+                return s.empty();
+            }
+        ),
+        match_list.end()
+    );
+
+    ui->include_tree->clear();
+
+    if(match_list.empty())
+    {
+        tree_view_builder build_tree(ui->include_tree);
+        boost::depth_first_search(
+            *include_graph_, boost::visitor(build_tree));
+    }
+    else
+    {
+        auto match_all_substrings = [&match_list](
+            cpp_dep::include_vertex_descriptor_t const& v,
+            cpp_dep::include_graph_t const& g)
+        {
+            cpp_dep::include_vertex_t const& file = g[v];
+            return std::all_of(
+                match_list.begin(),
+                match_list.end(),
+                [&file](std::string const& sub_str)
+                {
+                    return file.name.find(sub_str) != std::string::npos;
+                }
+            );
+        };
+
+        cpp_dep::include_graph_t result_graph;
+        filtered_subgraph_builder<
+            cpp_dep::include_graph_t
+        >graph_filter(match_all_substrings, result_graph);
+
+        boost::depth_first_search(
+            *include_graph_, boost::visitor(graph_filter));
+
+        tree_view_builder build_tree(ui->include_tree);
+        boost::depth_first_search(
+            result_graph, boost::visitor(build_tree));
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -105,31 +125,26 @@ void Dialog::dropEvent(QDropEvent* event)
                 cpp_dep::include_graph_t includes =
                     cpp_dep::read_deps_file(file.toStdString().c_str());
 
-                // Populate the include tree
-                {
-                    ui->include_tree->clear();
-                    tree_view_builder build_tree(ui->include_tree);
-                    boost::depth_first_search(
-                        includes, boost::visitor(build_tree));
-                }
-
-                cpp_dep::include_graph_t inverted =
+                cpp_dep::include_graph_t paths =
                     cpp_dep::invert_to_paths(includes);
 
-                // Populate the filesystem tree
-                {
-                    ui->filesystem_tree->clear();
-                    tree_view_builder build_tree(ui->filesystem_tree);
-                    boost::depth_first_search(
-                        inverted, boost::visitor(build_tree));
-                }
+                // Save the two graphs.
+                include_graph_ = std::make_unique<
+                    cpp_dep::include_graph_t
+                >(std::move(includes));
+
+                filesystem_graph_ = std::make_unique<
+                    cpp_dep::include_graph_t
+                >(std::move(paths));
+
+                populateTrees();
             }
             catch(std::exception& e)
             {
                 QString msg;
                 msg += "Failed to load \"" + file + "\"\n"
                     +  "Error: " + e.what();
-                    
+
                 QMessageBox msg_box;
                 msg_box.setText(msg);
                 msg_box.setIcon(QMessageBox::Critical);
@@ -160,4 +175,28 @@ void Dialog::dragMoveEvent(QDragMoveEvent* event)
 void Dialog::dragLeaveEvent(QDragLeaveEvent* event)
 {
     event->accept();
+}
+
+// -----------------------------------------------------------------------------
+//
+void Dialog::populateTrees()
+{
+    // Clear both trees first so that if parsing fails
+    // both are empty instead of just one.
+    ui->include_tree->clear();
+    ui->filesystem_tree->clear();
+
+    // Populate the include tree
+    {
+        tree_view_builder build_tree(ui->include_tree);
+        boost::depth_first_search(
+            *include_graph_, boost::visitor(build_tree));
+    }
+
+    // Populate the filesystem tree
+    {
+        tree_view_builder build_tree(ui->filesystem_tree);
+        boost::depth_first_search(
+            *filesystem_graph_, boost::visitor(build_tree));
+    }
 }

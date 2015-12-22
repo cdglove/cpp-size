@@ -43,12 +43,16 @@ struct include_vertex_t
     std::size_t size_dependencies;
 };
 
-typedef boost::adjacency_list<
-	boost::vecS, 
-	boost::vecS,
-	boost::bidirectionalS, 
-    include_vertex_t
-> include_graph_t;
+// Effectively a strong typedef so client
+// don't need to include the header just for the
+// typename.
+class include_graph_t : public
+    boost::adjacency_list<
+        boost::vecS,
+        boost::vecS,
+        boost::bidirectionalS,
+        include_vertex_t
+    > {};
 
 typedef boost::graph_traits<
 	include_graph_t

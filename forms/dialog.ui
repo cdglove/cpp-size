@@ -75,6 +75,13 @@
          </column>
         </widget>
        </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QLineEdit" name="filter_text"/>
+         </item>
+        </layout>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="filesystem_tab">
@@ -84,6 +91,9 @@
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
         <widget class="QTreeWidget" name="filesystem_tree">
+         <property name="contextMenuPolicy">
+          <enum>Qt::DefaultContextMenu</enum>
+         </property>
          <property name="sortingEnabled">
           <bool>true</bool>
          </property>
@@ -135,5 +145,25 @@
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>filter_text</sender>
+   <signal>textChanged(QString)</signal>
+   <receiver>Dialog</receiver>
+   <slot>filterTextChanged(QString)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>394</x>
+     <y>388</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>379</x>
+     <y>210</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>filterTextChanged(QString)</slot>
+ </slots>
 </ui>

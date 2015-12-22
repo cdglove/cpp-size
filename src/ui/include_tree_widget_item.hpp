@@ -63,7 +63,9 @@ public:
 	{
         size_ = size;
         setText(ColSize, QString::number((size+1023)/1024) + "kb");
-        setText(ColPercent, QString::number((size * 100) / total_size) + "%");
+
+        qint64 this_size = total_size ? (size * 100) / total_size : 0;
+        setText(ColPercent, QString::number(this_size) + "%");
         setTextAlignment(ColSize, Qt::AlignRight);
         setTextAlignment(ColPercent, Qt::AlignRight);
 	}
