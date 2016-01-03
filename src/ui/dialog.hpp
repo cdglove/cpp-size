@@ -1,5 +1,5 @@
 // *****************************************************************************
-// 
+//
 // ui/dialog.h
 //
 // Main dialog for cpp-size
@@ -17,6 +17,8 @@
 #include <QDialog>
 #include <QFutureWatcher>
 #include <memory>
+#include <deque>
+#include <QtConcurrent/QtConcurrent>
 
 // -----------------------------------------------------------------------------
 //
@@ -45,6 +47,7 @@ public:
 private slots:
 
     void filterTextChanged(QString const& filter_text);
+    void filterTreeBuilt();
 
 private:
 
@@ -58,7 +61,6 @@ private:
     // -------------------------------------------------------------------------
     // private helpers.
     void populateTrees();
-    void onTreeFiltered();
 
     Ui::Dialog *ui;
     std::unique_ptr<cpp_dep::include_graph_t> include_graph_;
@@ -67,6 +69,41 @@ private:
     // Forced to use a raw ptr here because QFuture doesn't support
     // move only types and shared_ptr doesn't have a release function.
     QFutureWatcher<QTreeWidget*> filtered_tree_watcher_;
+
+    template<typename Function, typename... Params>
+    void run_or_enqueue(Function fun, Params... params)
+    {
+        if(work_queue_.size() > 1)
+        {
+            work_queue_.pop_back();
+        }
+
+        work_queue_.push_back(
+            [=]()
+            {
+                return fun(params...);
+            }
+        );
+
+        if(work_queue_.size() == 1)
+        {
+            filtered_tree_watcher_.setFuture(QtConcurrent::run(work_queue_.front()));
+        }
+    }
+
+    void dequeue_and_run()
+    {
+        if(!work_queue_.empty())
+        {
+            work_queue_.pop_front();
+            if(!work_queue_.empty())
+            {
+                filtered_tree_watcher_.setFuture(QtConcurrent::run(work_queue_.front()));
+            }
+        }
+    }
+
+    std::deque<std::function<QTreeWidget*()>> work_queue_;
 };
 
 #endif // _UI_DIALOG_H_

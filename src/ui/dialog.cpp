@@ -27,7 +27,6 @@
 #include <QDragMoveEvent>
 #include <QMimeData>
 #include <QMessageBox>
-#include <QtConcurrent/QtConcurrent>
 #include <algorithm>
 
 // -----------------------------------------------------------------------------
@@ -40,7 +39,7 @@ Dialog::Dialog(QWidget *parent)
     ui->filesystem_tree->header()->resizeSection(0, 400);
     ui->include_tree->header()->resizeSection(0, 400);
 
-    connect(&filtered_tree_watcher_, SIGNAL(finished()), this, SLOT(onTreeFiltered()));
+    connect(&filtered_tree_watcher_, SIGNAL(finished()), this, SLOT(filterTreeBuilt()));
 }
 
 Dialog::~Dialog()
@@ -52,9 +51,9 @@ Dialog::~Dialog()
 //
 void Dialog::filterTextChanged(QString const& filter_text)
 {
-    auto do_filter = [filter_text, this]()
+    auto do_filter = [filter_text, this](QTreeWidget* tree)
     {
-        std::unique_ptr<QTreeWidget> tree(new QTreeWidget);
+        tree->clear();
         std::vector<std::string> match_list;
         std::string filter_text_std = filter_text.toStdString();
         boost::algorithm::split(
@@ -76,7 +75,7 @@ void Dialog::filterTextChanged(QString const& filter_text)
 
         if(match_list.empty())
         {
-            tree_view_builder build_tree(tree.get());
+            tree_view_builder build_tree(tree);
             boost::depth_first_search(
                 *include_graph_, boost::visitor(build_tree));
         }
@@ -105,16 +104,16 @@ void Dialog::filterTextChanged(QString const& filter_text)
             boost::depth_first_search(
                 *include_graph_, boost::visitor(graph_filter));
 
-            tree_view_builder build_tree(tree.get());
+            tree_view_builder build_tree(tree);
             boost::depth_first_search(
                 result_graph, boost::visitor(build_tree));
         }
 
-        return tree.release();
+        return tree;
     };
 
-    QFuture<QTreeWidget*> f = QtConcurrent::run(do_filter);
-    filtered_tree_watcher_.setFuture(f);
+    if(include_graph_)
+        run_or_enqueue(do_filter, new QTreeWidget);
 }
 
 // -----------------------------------------------------------------------------
@@ -162,6 +161,8 @@ void Dialog::dropEvent(QDropEvent* event)
             }
         }
     }
+
+    filterTextChanged(ui->filter_text->text());
 }
 
 // -----------------------------------------------------------------------------
@@ -213,9 +214,22 @@ void Dialog::populateTrees()
 
 // -----------------------------------------------------------------------------
 //
-void Dialog::onTreeFiltered()
+void Dialog::filterTreeBuilt()
 {
     QFuture<QTreeWidget*> new_tree = filtered_tree_watcher_.future();
-    delete ui->include_tree;
-    ui->include_tree = new_tree.result();
+    QTreeWidget* new_tree_ptr = new_tree.result();
+
+    assert(new_tree_ptr != ui->include_tree);
+
+    ui->include_tree->clear();
+
+    for(int i = 0; i < new_tree_ptr->topLevelItemCount(); ++i)
+    {
+        ui->include_tree->insertTopLevelItem(
+            i, new_tree_ptr->takeTopLevelItem(i)
+        );
+    }
+    delete new_tree_ptr;
+
+    dequeue_and_run();
 }
