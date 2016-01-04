@@ -34,12 +34,13 @@
 Dialog::Dialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::Dialog)
+    , update_tree_widget_(std::bind(&Dialog::filterTreeBuilt, this, std::placeholders::_1))
 {
     ui->setupUi(this);
     ui->filesystem_tree->header()->resizeSection(0, 400);
     ui->include_tree->header()->resizeSection(0, 400);
 
-    connect(&filtered_tree_watcher_, SIGNAL(finished()), this, SLOT(filterTreeBuilt()));
+    //std::function<void(QTreeWidget*)> f = std::bind(this, &Dialog::filterTreeBuilt);
 }
 
 Dialog::~Dialog()
@@ -113,7 +114,7 @@ void Dialog::filterTextChanged(QString const& filter_text)
     };
 
     if(include_graph_)
-        run_or_enqueue(do_filter, new QTreeWidget);
+        update_tree_widget_.run_or_enqueue(do_filter, new QTreeWidget);
 }
 
 // -----------------------------------------------------------------------------
@@ -214,22 +215,18 @@ void Dialog::populateTrees()
 
 // -----------------------------------------------------------------------------
 //
-void Dialog::filterTreeBuilt()
+void Dialog::filterTreeBuilt(QTreeWidget* new_widget)
 {
-    QFuture<QTreeWidget*> new_tree = filtered_tree_watcher_.future();
-    QTreeWidget* new_tree_ptr = new_tree.result();
+    assert(new_widget != ui->include_tree);
 
-    assert(new_tree_ptr != ui->include_tree);
+     ui->include_tree->clear();
 
-    ui->include_tree->clear();
+     for(int i = 0; i < new_widget->topLevelItemCount(); ++i)
+     {
+         ui->include_tree->insertTopLevelItem(
+             i, new_widget->takeTopLevelItem(i)
+         );
+     }
 
-    for(int i = 0; i < new_tree_ptr->topLevelItemCount(); ++i)
-    {
-        ui->include_tree->insertTopLevelItem(
-            i, new_tree_ptr->takeTopLevelItem(i)
-        );
-    }
-    delete new_tree_ptr;
-
-    dequeue_and_run();
+     delete new_widget;
 }
