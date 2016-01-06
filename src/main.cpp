@@ -15,6 +15,10 @@
 #include "ui/dialog.hpp"
 #include <QApplication>
 
+#if defined(_WIN32) && defined(QT_STATIC)
+  Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+#endif
+
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);

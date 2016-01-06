@@ -24,9 +24,8 @@ set(CMAKE_AUTOMOC ON)
 
 # Instruct CMake to run uic automatically when needed.
 #set(CMAKE_AUTOUIC ON)
-set(CMAKE_EXE_LINKER_FLAGS "-static")
 
-find_package(Qt5Widgets)
+find_package(Qt5Widgets REQUIRED)
 find_package(
 	Boost REQUIRED
 	system
