@@ -49,7 +49,11 @@ struct tree_view_builder : boost::default_dfs_visitor
 
         current_item_ = new IncludeTreeWidgetItem(current_item_);
         current_item_->setColumnFile(file.name.c_str());
-        current_item_->setColumnSize(file.size + file.size_dependencies, total_size_);
+        std::size_t family_tree_size = 0;
+        //if(!file.already_included)
+            family_tree_size = file.size + file.size_dependencies;
+
+        current_item_->setColumnSize(family_tree_size, total_size_);
         current_item_->setColumnOrder(current_order_++);
     }
 

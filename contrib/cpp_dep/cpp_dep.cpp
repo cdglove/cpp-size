@@ -20,13 +20,31 @@
 
 // -----------------------------------------------------------------------------
 //
+using namespace cpp_dep;
+
+// -----------------------------------------------------------------------------
+//
+struct known_file_node_t
+{
+    known_file_node_t(std::string name_, include_vertex_descriptor_t vert_)
+        : name(std::move(name_))
+        , vertex_descriptor(std::move(vert_))
+    {}
+
+    std::string name;
+    include_vertex_descriptor_t vertex_descriptor;
+};
+
 typedef boost::unordered::unordered_set<
-    std::string
+    known_file_node_t
 > known_file_set_t;
 
 // -----------------------------------------------------------------------------
 //
-using namespace cpp_dep;
+struct subtree_cloner : boost::default_dfs_visitor
+{
+
+};
 
 template<typename Iterator>
 Iterator getline(Iterator cur, Iterator end, std::string& line)
@@ -112,18 +130,31 @@ static void ReadDepsFileRecursive(
             if(file.empty())
                 continue;
 
-            std::size_t this_size = 0;
-            auto known_it = known_files.find(file);
-            if(known_it == known_files.end())
+            std::size_t this_size = 0; 
+            bool already_included = true;
+            auto found_file = known_files.find(file); 
+            if(found_file == known_files.end())
             {
-                this_size += boost::filesystem::file_size(file.c_str());
-                known_files.insert(file);
+                already_included = false;
+                this_size = boost::filesystem::file_size(file.c_str());
+
+                // Add subpath with 0 size.
+                subtree_cloner clone_tree; 
+                boost::depth_first_search(
+                    *filesystem_graph_, boost::visitor(clone_tree), found_file.vertex_descriptor);
             }
 
             sub_tree_size += this_size;
-            last_added = boost::add_vertex(include_vertex_t(file, this_size), deps);
+
+            last_added = boost::add_vertex(include_vertex_t(file, this_size, already_included), deps);
             auto result = boost::add_edge(parent, last_added, deps);
             BOOST_ASSERT(result.second);
+
+            if(!already_included)
+            {
+                known_files.insert(known_file_node_t(file, last_added));
+            }
+
 			++line_number;
 		}
 		else
@@ -265,7 +296,7 @@ include_graph_t cpp_dep::invert_to_paths(include_graph_t const& g)
             }
             else
             {
-                vert = boost::add_vertex(include_vertex_t(partial_path_string, 0), result);
+                vert = boost::add_vertex(include_vertex_t(partial_path_string, 0, false), result);
                 partial_path_map.insert(std::make_pair(partial_path_string, vert));
                 boost::add_edge(last_vert, vert, result);
             }

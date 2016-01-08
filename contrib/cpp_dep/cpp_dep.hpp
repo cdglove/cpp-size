@@ -30,17 +30,20 @@ struct include_vertex_t
         : name("")
         , size(0)
         , size_dependencies(0)
+        , already_included(false)
     {}
 
-    include_vertex_t(std::string name_, std::size_t size_)
+    include_vertex_t(std::string name_, std::size_t size_, bool already_included_)
         : name(name_)
         , size(size_)
         , size_dependencies(0)
+        , already_included(already_included_)
     {}
 
     std::string name;
     std::size_t size;
     std::size_t size_dependencies;
+    bool already_included;
 };
 
 // Effectively a strong typedef so client
