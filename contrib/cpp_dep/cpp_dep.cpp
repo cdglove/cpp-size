@@ -24,19 +24,8 @@ using namespace cpp_dep;
 
 // -----------------------------------------------------------------------------
 //
-struct known_file_node_t
-{
-    known_file_node_t(std::string name_, include_vertex_descriptor_t vert_)
-        : name(std::move(name_))
-        , vertex_descriptor(std::move(vert_))
-    {}
-
-    std::string name;
-    include_vertex_descriptor_t vertex_descriptor;
-};
-
-typedef boost::unordered::unordered_set<
-    known_file_node_t
+typedef boost::unordered::unordered_map<
+    std::string, include_vertex_descriptor_t
 > known_file_set_t;
 
 // -----------------------------------------------------------------------------
@@ -141,7 +130,7 @@ static void ReadDepsFileRecursive(
                 // Add subpath with 0 size.
                 subtree_cloner clone_tree; 
                 boost::depth_first_search(
-                    *filesystem_graph_, boost::visitor(clone_tree), found_file.vertex_descriptor);
+                    deps, boost::visitor(clone_tree), found_file->second);
             }
 
             sub_tree_size += this_size;
@@ -152,7 +141,7 @@ static void ReadDepsFileRecursive(
 
             if(!already_included)
             {
-                known_files.insert(known_file_node_t(file, last_added));
+                known_files.insert(std::make_pair(file, last_added));
             }
 
 			++line_number;
