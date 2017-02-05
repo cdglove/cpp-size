@@ -40,6 +40,8 @@ file(GLOB_RECURSE PROJECT_FORMS forms/*.ui)
 
 QT5_WRAP_UI(UIS_HDRS ${PROJECT_FORMS})
 
+add_subdirectory(contrib/cpp_dep)
+
 add_executable(
 	cpp-size WIN32 
 	${PROJECT_SOURCES}
@@ -53,13 +55,9 @@ target_include_directories(
 	"contrib"
 )
 
-target_include_directories(
-	cpp-size SYSTEM PUBLIC 
-	${Boost_INCLUDE_DIRS}
-)
-
 target_link_libraries(
 	cpp-size
+	cpp_dep
 	Qt5::Widgets 
 	Qt5::Core
 	${Boost_LIBRARIES}

@@ -1,0 +1,3 @@
+[submodule "contrib/cpp_dep"]
+	path = contrib/cpp_dep
+	url = git@github.com:cdglove/cpp_dep.git
