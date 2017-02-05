@@ -59,10 +59,10 @@ public:
 private:
 
     void task_complete()
-	{
+    {
         on_complete_(result_watcher_.future().result());
         dequeue_and_run();
-	}
+    }
 
     void dequeue_and_run()
     {

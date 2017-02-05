@@ -11,22 +11,20 @@
 // http://www.boost.org/LICENSE_1_0.txt
 //
 // *****************************************************************************
-#include "cpp_dep/cpp_dep.hpp"
+#include "cpp_dep.hpp"
 #include <fstream>
-#include <boost/graph/topological_sort.hpp>
-#include <boost/graph/breadth_first_search.hpp>
-#include <boost/unordered/unordered_set.hpp>
+#include <boost/graph/graphviz.hpp>
+#include <boost/container/map.hpp>
 #include <boost/filesystem.hpp>
 
 // -----------------------------------------------------------------------------
 //
-typedef boost::unordered::unordered_set<
-    std::string
-> known_file_set_t;
-
-// -----------------------------------------------------------------------------
-//
 using namespace cpp_dep;
+
+typedef boost::container::map<
+    std::string,
+    include_vertex_descriptor_t
+> known_file_set_t;
 
 template<typename Iterator>
 Iterator getline(Iterator cur, Iterator end, std::string& line)
@@ -51,46 +49,46 @@ static void ReadDepsFileRecursive(
     char const* line_prefix,
     char depth_mark,
     include_vertex_descriptor_t parent,
-	int depth, 
+    int depth, 
     include_graph_t& deps,
     known_file_set_t& known_files,
-	int& line_number, 
+    int& line_number, 
     std::size_t& size,
     Iterator& current,
-   	Iterator end)
+    Iterator end)
 {
-    include_vertex_descriptor_t last_added = include_vertex_descriptor_t();
-	std::string file;
+    include_vertex_descriptor_t last_target = include_vertex_descriptor_t();
+    std::string file;
     std::size_t sub_tree_size = 0;
-	while(current != end)
-	{
-		int line_depth = 0;
-		Iterator line_start_pos = current;
+    while(current != end)
+    {
+        int line_depth = 0;
+        Iterator line_start_pos = current;
 
         for(int i = 0; current != end && *current == line_prefix[i]; ++i)
             ++current;
 
         while(current != end && *current == depth_mark)
-		{
-			++line_depth;
-			++current;
-		}
+        {
+            ++line_depth;
+            ++current;
+        }
 
-		if(line_depth == 0)
-		{
+        if(line_depth == 0)
+        {
             current = getline(current, end, file);
-			++line_number;
-			continue;
-		}
+            ++line_number;
+            continue;
+        }
 
-		if(line_depth <= depth)
-		{
+        if(line_depth <= depth)
+        {
             current = line_start_pos;
             break;
-		}
+        }
 
-		if(line_depth == (depth + 1))
-		{
+        if(line_depth == (depth + 1))
+        {
             // On gcc files, theres an extra space here.
             if(*current == ' ')
                 ++current;
@@ -105,7 +103,7 @@ static void ReadDepsFileRecursive(
                     if(c == '\\' || c == '/')
                         return (char)boost::filesystem::path::preferred_separator;
                     else
-                        return (char)std::tolower(c);
+                        return std::tolower(c, std::locale());
                 }
             );
 
@@ -117,22 +115,26 @@ static void ReadDepsFileRecursive(
             if(known_it == known_files.end())
             {
                 this_size += boost::filesystem::file_size(file.c_str());
-                known_files.insert(file);
+                last_target = boost::add_vertex(include_vertex_t(file, this_size), deps);
+                known_files.emplace(file, last_target);
+            }
+            else
+            {
+                last_target = known_it->second;
             }
 
             sub_tree_size += this_size;
-            last_added = boost::add_vertex(include_vertex_t(file, this_size), deps);
-            auto result = boost::add_edge(parent, last_added, deps);
+            auto result = boost::add_edge(parent, last_target, include_edge_t(), deps);
             BOOST_ASSERT(result.second);
-			++line_number;
-		}
-		else
-		{
+            ++line_number;
+        }
+        else
+        {
             current = line_start_pos;
             ReadDepsFileRecursive(
                 line_prefix,
                 depth_mark,
-                last_added,
+                last_target,
                 depth+1,
                 deps,
                 known_files,
@@ -140,8 +142,8 @@ static void ReadDepsFileRecursive(
                 sub_tree_size,
                 current,
                 end);
-		}
-	}
+        }
+    }
 
     size += sub_tree_size;
     deps[parent].size_dependencies = sub_tree_size;
@@ -178,10 +180,10 @@ static include_graph_t ReadGccDepsFile(std::string const& deps)
 //
 static include_graph_t ReadMsvcDepsFile(std::string const& deps)
 {
-	include_graph_t dep_graph;
+    include_graph_t dep_graph;
     include_vertex_descriptor_t root = add_vertex(include_vertex_t(), dep_graph);
     known_file_set_t known_files;
-	int line_number = 0;
+    int line_number = 0;
     std::size_t tree_size;
     auto begin = deps.begin();
     auto end = deps.end();
@@ -198,30 +200,30 @@ static include_graph_t ReadMsvcDepsFile(std::string const& deps)
         end
     );
 
-	return dep_graph;
+    return dep_graph;
 }
 
 // -----------------------------------------------------------------------------
 //
 include_graph_t cpp_dep::read_deps_file(char const* file)
 {
-	std::ifstream ins(file);
-	if(!ins.is_open())
-	{
+    std::ifstream ins(file);
+    if(!ins.is_open())
+    {
         throw std::runtime_error(std::string("Failed to open ") + file + " for reading.");
-	}
+    }
 
     std::stringstream sins;
     sins << ins.rdbuf();
 
     if(sins.peek() == '.')
-	{
+    {
         return ReadGccDepsFile(sins.str());
-	}
-	else
-	{
+    }
+    else
+    {
         return ReadMsvcDepsFile(sins.str());
-	}
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -278,5 +280,34 @@ include_graph_t cpp_dep::invert_to_paths(include_graph_t const& g)
 
     return result;
 }
+namespace cpp_dep { namespace {
 
+class include_vertex_writer 
+{
+public:
+
+    include_vertex_writer(include_graph_t const& g)
+        : g_(g)
+    {}
+    
+    void operator()(std::ostream& out, include_vertex_descriptor_t const& v) const
+    {
+        out << "[label=\"" << g_[v].name << "\"]";
+    }
+
+private:
+
+    include_graph_t const& g_;
+};
+
+} // namespace {
+
+// -----------------------------------------------------------------------------
+//
+void write_graphviz(std::ostream& out, include_graph_t const& g)
+{
+    boost::write_graphviz(out, g, include_vertex_writer(g));
+}
+
+} // namespace cpp_dep
 

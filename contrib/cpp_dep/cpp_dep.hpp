@@ -11,12 +11,13 @@
 // http://www.boost.org/LICENSE_1_0.txt
 //
 // *****************************************************************************
-#ifndef _CPPDEP_CPPDEP_HPP_
-#define _CPPDEP_CPPDEP_HPP_
+#ifndef CPPDEP_CPPDEP_HPP_
+#define CPPDEP_CPPDEP_HPP_
 
 #include <string>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
+#include <iosfwd>
 
 // -----------------------------------------------------------------------------
 //
@@ -30,17 +31,25 @@ struct include_vertex_t
         : name("")
         , size(0)
         , size_dependencies(0)
+        , included_count(0)
     {}
 
     include_vertex_t(std::string name_, std::size_t size_)
         : name(name_)
         , size(size_)
         , size_dependencies(0)
+        , included_count(0)
     {}
 
     std::string name;
     std::size_t size;
     std::size_t size_dependencies;
+    int included_count;
+};
+
+struct include_edge_t
+{
+
 };
 
 // Effectively a strong typedef so client
@@ -50,13 +59,18 @@ class include_graph_t : public
     boost::adjacency_list<
         boost::vecS,
         boost::vecS,
-        boost::bidirectionalS,
-        include_vertex_t
+        boost::directedS,
+        include_vertex_t,
+        include_edge_t
     > {};
 
 typedef boost::graph_traits<
-	include_graph_t
+    include_graph_t
 >::vertex_descriptor include_vertex_descriptor_t;
+
+typedef boost::graph_traits<
+    include_graph_t
+>::edge_descriptor include_edge_descriptor_t;
 
 // -----------------------------------------------------------------------------
 // Builds the include deps graph from ain input file. The file must be in the 
@@ -72,6 +86,10 @@ include_graph_t read_deps_file(char const* file);
 //   /home/user/src/project
 // followed by the next, etc.
 include_graph_t invert_to_paths(include_graph_t const& g);
+
+// -----------------------------------------------------------------------------
+//
+void write_graphviz(std::ostream& out, include_graph_t const& g);
 }
 
-#endif // _CPPDEP_CPPDEP_HPP_
+#endif // CPPDEP_CPPDEP_HPP_

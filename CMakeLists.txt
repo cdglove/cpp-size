@@ -26,6 +26,8 @@ set(CMAKE_AUTOMOC ON)
 #set(CMAKE_AUTOUIC ON)
 
 find_package(Qt5Widgets REQUIRED)
+
+set(Boost_USE_STATIC_LIBS ON)
 find_package(
 	Boost REQUIRED
 	system

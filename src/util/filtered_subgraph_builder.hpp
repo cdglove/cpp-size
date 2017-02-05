@@ -13,121 +13,122 @@
 // http://www.boost.org/LICENSE_1_0.txt
 //
 // *****************************************************************************
-#ifndef _CPPSIZE_UTIL_FILTEREDSUBGRAPHBUILDER_HPP_
-#define _CPPSIZE_UTIL_FILTEREDSUBGRAPHBUILDER_HPP_
+#ifndef CPPSIZE_UTIL_FILTEREDSUBGRAPHBUILDER_HPP_
+#define CPPSIZE_UTIL_FILTEREDSUBGRAPHBUILDER_HPP_
 
 #include <boost/graph/depth_first_search.hpp>
-#include "ui/include_tree_widget_item.hpp"
+#include "ui/tree_view_builder.hpp"
 #include "cpp_dep/cpp_dep.hpp"
+#include <vector>
 
 // -----------------------------------------------------------------------------
 //
-template<typename Graph>
-struct filtered_subgraph_builder : boost::default_dfs_visitor
+struct filtered_tree_view_builder
 {
-    typedef typename boost::graph_traits<
-        Graph
-    >::vertex_descriptor vertex_descriptor;
-
-    typedef typename boost::graph_traits<
-        Graph
-    >::edge_descriptor edge_descriptor;
-
-    typedef std::function<
-        bool(vertex_descriptor const&, Graph const&)
-    > filter_func_t;
-
-    filtered_subgraph_builder(
-        filter_func_t filter_func,
-        Graph& result_graph)
-        : filter_func_(std::move(filter_func))
-        , result_graph_(result_graph)
-        , match_count_(0)
-    {}
-
-    void start_vertex(vertex_descriptor const& v, Graph const& g)
+    template<typename FilterFunc>
+    void operator()(cpp_dep::include_graph_t const& g, QTreeWidget* root, FilterFunc&& filter_func)
     {
-        resolved_path_.push_back(boost::add_vertex(g[v], result_graph_));
-        current_path_.push_back(v);
+        std::vector<bool> keepers(boost::num_vertices(g), false);
+        filter_builder<VisitPolicy::Initial, std::decay_t<FilterFunc>> build(std::move(filter_func), keepers);
+        boost::depth_first_search(g, boost::visitor(build));
+
+        filter_applier apply(keepers);
+        apply(g, root);   
     }
 
-    void tree_edge(edge_descriptor const& e, Graph const& g)
-    {
-        current_path_.push_back(e.m_target);
+private:
 
-        if(match_count_ > 0)
+    struct terminator {};
+    enum class VisitPolicy
+    {
+        Initial,
+        Recursing,
+    };
+
+    template<VisitPolicy Policy, typename FilterFunc>
+    struct filter_builder : boost::default_dfs_visitor
+    {
+
+        filter_builder(FilterFunc filter_func, std::vector<bool>& keepers)
+            : filter_func_(std::move(filter_func))
+            , keepers_(keepers)
+        {}
+
+        void start_vertex(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
         {
-            auto new_vert = boost::add_vertex(g[e.m_target], result_graph_);
-            boost::add_edge(resolved_path_.back(), new_vert, result_graph_);
-            resolved_path_.push_back(new_vert);
-            match_stack_.push_back(false);
+            visited_.resize(boost::num_vertices(g), false);
+            if(v == 0 && is_recursing())
+                throw terminator();
+
+            vertex_stack_.push_back(v);
         }
-        else
+
+        void discover_vertex(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
         {
-            if(filter_func_(e.m_target, g))
+            visited_[v] = true;
+
+            if(filter_func_(v, g))
             {
-                resolve_current_path(g);
-
-                match_stack_.push_back(true);
-                ++match_count_;
+                keepers_[v] = true;
+                // If we keep one in the tree, we keep all of the ones in the stack
+                // But we only need to traverse the stack if the top isn't already true.
+                //if(!keepers_[vertex_stack_.back()])
+                {
+                    for(auto&& vert : vertex_stack_)
+                    {
+                        keepers_[vert] = true;
+                    }
+                }
             }
-            else
+            
+            vertex_stack_.push_back(v);
+        }
+
+        void examine_edge(cpp_dep::include_edge_descriptor_t const& e, cpp_dep::include_graph_t const& g)
+        {
+            if(visited_[e.m_target] && !is_recursing())
             {
-                match_stack_.push_back(false);
+                try
+                {
+                    filter_builder<VisitPolicy::Recursing, FilterFunc> branch(filter_func_, keepers_);
+                    branch.vertex_stack_ = vertex_stack_;
+                    boost::depth_first_search(g, boost::visitor(branch).root_vertex(e.m_target));
+                }
+                catch(terminator)
+                {
+                }
             }
-        }        
-    }
+        }
 
-    void finish_vertex(vertex_descriptor const& v, Graph const&)
+        void finish_vertex(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
+        {
+            vertex_stack_.pop_back();
+        }
+
+        bool is_recursing()
+        {
+            return Policy == VisitPolicy::Recursing;
+        }
+
+        FilterFunc filter_func_;
+        std::vector<cpp_dep::include_vertex_descriptor_t> vertex_stack_;
+        std::vector<bool>& keepers_;
+        std::vector<bool> visited_;
+    };
+
+    struct filter_applier : tree_view_builder_base<filter_applier>
     {
-        assert(current_path_.back() == v);
-        current_path_.pop_back();
-        if(match_count_ > 0)
+        filter_applier(std::vector<bool>& keepers)
+            : keepers_(keepers)
+        {}
+
+        bool filter(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const&)
         {
-            resolved_path_.pop_back();
-        }
-        else if(resolved_path_.size() > current_path_.size())
-        {
-            resolved_path_.pop_back();
+            return keepers_[v];
         }
 
-        bool is_match = match_stack_.back();
-        if(is_match)
-        {
-            --match_count_;
-        }
-
-        match_stack_.pop_back();
-    }
-
-protected:
-
-    void resolve_current_path(Graph const& g)
-    {
-        auto last_added = resolved_path_.back();
-        std::for_each(
-            current_path_.begin() + resolved_path_.size(),
-            current_path_.end(),
-            [&](auto&& v)
-            {
-                auto new_vert = boost::add_vertex(g[v], result_graph_);
-                boost::add_edge(last_added, new_vert, result_graph_);
-                last_added = new_vert;
-                resolved_path_.push_back(new_vert);
-            }
-        );
-    }
-
-    std::vector<vertex_descriptor> current_path_;
-    std::vector<vertex_descriptor> resolved_path_;
-    std::vector<bool> match_stack_;
-    int match_count_;
-
-    std::function<
-        bool(vertex_descriptor const&, Graph const&)
-    > filter_func_;
-
-    Graph& result_graph_;
+        std::vector<bool>& keepers_;
+    };
 };
 
-#endif // _CPPSIZE_UTIL_FILTEREDSUBGRAPHBUILDER_HPP_
+#endif // CPPSIZE_UTIL_FILTEREDSUBGRAPHBUILDER_HPP_

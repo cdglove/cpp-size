@@ -73,6 +73,11 @@
            <set>AlignVCenter</set>
           </property>
          </column>
+         <column>
+          <property name="text">
+           <string>Occurence</string>
+          </property>
+         </column>
         </widget>
        </item>
        <item>

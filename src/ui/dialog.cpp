@@ -39,8 +39,6 @@ Dialog::Dialog(QWidget *parent)
     ui->setupUi(this);
     ui->filesystem_tree->header()->resizeSection(0, 400);
     ui->include_tree->header()->resizeSection(0, 400);
-
-    //std::function<void(QTreeWidget*)> f = std::bind(this, &Dialog::filterTreeBuilt);
 }
 
 Dialog::~Dialog()
@@ -76,9 +74,8 @@ void Dialog::filterTextChanged(QString const& filter_text)
 
         if(match_list.empty())
         {
-            tree_view_builder build_tree(tree);
-            boost::depth_first_search(
-                *include_graph_, boost::visitor(build_tree));
+            tree_view_builder build_tree;
+            build_tree(*include_graph_, tree);
         }
         else
         {
@@ -97,17 +94,8 @@ void Dialog::filterTextChanged(QString const& filter_text)
                 );
             };
 
-            cpp_dep::include_graph_t result_graph;
-            filtered_subgraph_builder<
-                cpp_dep::include_graph_t
-            >graph_filter(match_all_substrings, result_graph);
-
-            boost::depth_first_search(
-                *include_graph_, boost::visitor(graph_filter));
-
-            tree_view_builder build_tree(tree);
-            boost::depth_first_search(
-                result_graph, boost::visitor(build_tree));
+            filtered_tree_view_builder graph_filter;
+            graph_filter(*include_graph_, tree, match_all_substrings);
         }
 
         return tree;
@@ -200,16 +188,14 @@ void Dialog::populateTrees()
 
     // Populate the include tree
     {
-        tree_view_builder build_tree(ui->include_tree);
-        boost::depth_first_search(
-            *include_graph_, boost::visitor(build_tree));
+        tree_view_builder build_tree;
+        build_tree(*include_graph_, ui->include_tree);
     }
 
     // Populate the filesystem tree
     {
-        tree_view_builder build_tree(ui->filesystem_tree);
-        boost::depth_first_search(
-            *filesystem_graph_, boost::visitor(build_tree));
+        tree_view_builder build_tree;
+        build_tree(*filesystem_graph_, ui->filesystem_tree);
     }
 }
 
