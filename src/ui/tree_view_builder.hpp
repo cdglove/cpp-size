@@ -16,136 +16,115 @@
 
 #include <boost/graph/depth_first_search.hpp>
 #include "ui/include_tree_widget_item.hpp"
-#include "cpp_dep/cpp_dep.hpp"
+#include "cpp_dep/inferred_include_visitor.hpp"
 
 // -----------------------------------------------------------------------------
 //
 template<typename Derived>
-struct tree_view_builder_base
+struct tree_view_builder_base : cpp_dep::inferred_include_visitor<tree_view_builder_base<Derived>>
 {
+    struct option
+    {
+        enum
+        {
+            none        = 0,
+            checkbox    = 1 << 0,
+        };
+    };
+
+    tree_view_builder_base(std::uint32_t options)
+        : options_(options)
+    {}
+
     void operator()(cpp_dep::include_graph_t const& g, QTreeWidget* root)
     {
         current_item_ = nullptr;
         current_order_ = 0;
         total_size_ = 0;
         root_ = root;
-        include_count_.resize(boost::num_vertices(g), 0);
 
-        dfs_visitor<VisitPolicy::Initial> visit(this);
-        boost::depth_first_search(g, boost::visitor(visit));
+        this->visit(g);
     }
 
 private:
+
+    bool filter(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
+    {
+        return true;
+    }
+
+    friend class cpp_dep::inferred_include_visitor<tree_view_builder_base<Derived>>;
+
+    void root_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
+    {
+        cpp_dep::include_vertex_t const& file = g[v];
+
+        total_size_ = file.size + file.size_dependencies;
+        current_item_ = new IncludeTreeWidgetItem(root_);
+        current_item_->setColumnFile(file.name.c_str());
+        current_item_->setColumnSize(total_size_, total_size_);
+        current_item_->setColumnOrder(current_order_++);
+        current_item_->setColumnOccurence(this->get_include_count(v));
+
+        if(wants_checkboxes())
+        {
+            current_item_->showCheckbox();
+        }
+    }
+
+    void include_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
+    {
+        if(!derived().filter(v, g))            return;
+
+        cpp_dep::include_vertex_t const& file = g[v];
+        
+        std::size_t show_size = file.size + file.size_dependencies;
+        current_item_ = new IncludeTreeWidgetItem(current_item_);
+        current_item_->setColumnFile(file.name.c_str());
+        current_item_->setColumnSize(show_size, total_size_);
+        current_item_->setColumnOrder(current_order_++);
+        current_item_->setColumnOccurence(this->get_include_count(v));
+
+        if(wants_checkboxes())
+        {
+            current_item_->showCheckbox();
+        }
+    }
+
+    void finish_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
+    {
+        if(!derived().filter(v, g))
+            return;
+
+        current_item_ = current_item_->parent();
+    }
 
     Derived& derived()
     {
         return *static_cast<Derived*>(this);
     }
 
-    struct terminator {};
-    enum class VisitPolicy
+    bool wants_checkboxes() const
     {
-        Initial,
-        Recursing,
-    };
+        return (options_ & option::checkbox);
+    }
 
-    template<VisitPolicy Policy>
-    struct dfs_visitor : boost::default_dfs_visitor
-    {
-
-        dfs_visitor(tree_view_builder_base* owner)
-            : owner_(owner)
-        {}
-
-        void start_vertex(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
-        {
-            if(!v && is_recursing())
-                throw terminator();
-
-            if(!owner_->derived().filter(v, g))
-                return;
-
-            cpp_dep::include_vertex_t const& file = g[v];
-
-
-            if(is_recursing())
-            {
-                owner_->current_item_ = new IncludeTreeWidgetItem(owner_->current_item_);
-            }
-            else
-            {
-                owner_->total_size_ = file.size + file.size_dependencies;
-                owner_->current_item_ = new IncludeTreeWidgetItem(owner_->root_);
-            }
-
-            owner_->current_item_->setColumnFile(file.name.c_str());
-            owner_->current_item_->setColumnSize(is_recursing() ? 0 : owner_->total_size_, owner_->total_size_);
-            owner_->current_item_->setColumnOrder(owner_->current_order_++);
-            owner_->current_item_->setColumnOccurence(owner_->include_count_[v]);
-        }
-
-        void examine_edge(cpp_dep::include_edge_descriptor_t const& e, cpp_dep::include_graph_t const& g)
-        {
-            if(!owner_->derived().filter(e.m_target, g))
-                return;
-
-            if(owner_->include_count_[e.m_target]++ && !is_recursing())
-            {
-                try 
-                {
-                    dfs_visitor<VisitPolicy::Recursing> recurse(owner_);
-                    boost::depth_first_search(g, boost::visitor(recurse).root_vertex(e.m_target));
-                }
-                catch(terminator)
-                {}
-            }
-            else
-            {
-                cpp_dep::include_vertex_t const& file = g[e.m_target];
-                cpp_dep::include_edge_t edge = g[e];
-
-                std::size_t show_size = is_recursing() ? 0 : file.size + file.size_dependencies;
-                owner_->current_item_ = new IncludeTreeWidgetItem(owner_->current_item_);
-                owner_->current_item_->setColumnFile(file.name.c_str());
-                owner_->current_item_->setColumnSize(show_size, owner_->total_size_);
-                owner_->current_item_->setColumnOrder(owner_->current_order_++);
-                owner_->current_item_->setColumnOccurence(owner_->include_count_[e.m_target]);
-            }
-        }
-
-        void finish_vertex(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
-        {
-            if(!owner_->derived().filter(v, g))
-                return;
-
-            owner_->current_item_ = owner_->current_item_->parent();
-        }
-
-    private:
-
-        bool is_recursing() const
-        {
-            return Policy == VisitPolicy::Recursing;
-        }
-
-        tree_view_builder_base* owner_;
-    };
-
-    std::vector<int> include_count_;
     QTreeWidget* root_;
     IncludeTreeWidgetItem* current_item_;
     int current_order_;
     std::size_t total_size_;
+    std::uint32_t options_;
 };
 
 // -----------------------------------------------------------------------------
 //
 struct tree_view_builder : tree_view_builder_base<tree_view_builder>
 {
-    bool filter(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
-    {
-        return true;
-    }
+    tree_view_builder(std::uint32_t options)
+        : tree_view_builder_base(options)
+    {}
 };
+
+
 
 #endif // CPPSIZE_UI_TREEVIEWBUILDER_HPP_

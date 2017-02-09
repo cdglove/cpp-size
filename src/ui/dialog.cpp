@@ -74,7 +74,7 @@ void Dialog::filterTextChanged(QString const& filter_text)
 
         if(match_list.empty())
         {
-            tree_view_builder build_tree;
+            tree_view_builder build_tree(tree_view_builder::option::checkbox);
             build_tree(*include_graph_, tree);
         }
         else
@@ -151,6 +151,7 @@ void Dialog::dropEvent(QDropEvent* event)
         }
     }
 
+    // Reapply the filter text.
     filterTextChanged(ui->filter_text->text());
 }
 
@@ -186,15 +187,9 @@ void Dialog::populateTrees()
     ui->include_tree->clear();
     ui->filesystem_tree->clear();
 
-    // Populate the include tree
-    {
-        tree_view_builder build_tree;
-        build_tree(*include_graph_, ui->include_tree);
-    }
-
     // Populate the filesystem tree
     {
-        tree_view_builder build_tree;
+        tree_view_builder build_tree(tree_view_builder::option::none);
         build_tree(*filesystem_graph_, ui->filesystem_tree);
     }
 }

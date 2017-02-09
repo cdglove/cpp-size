@@ -36,7 +36,7 @@ find_package(
 set(CMAKE_CXX_STANDARD 14)
 file(GLOB_RECURSE PROJECT_SOURCES src/*.cpp contrib/*.cpp)
 file(GLOB_RECURSE PROJECT_HEADERS src/*.hpp contrib/*.hpp)
-file(GLOB_RECURSE PROJECT_FORMS forms/*.ui)
+file(GLOB_RECURSE PROJECT_FORMS "forms/*.ui")
 
 QT5_WRAP_UI(UIS_HDRS ${PROJECT_FORMS})
 
@@ -49,10 +49,8 @@ add_executable(
 	${PROJECT_FORMS}
 )
 
-target_include_directories(
-	cpp-size PUBLIC 
-	"src" 
-	"contrib"
+target_include_directories(cpp-size PUBLIC 	
+	src
 )
 
 target_link_libraries(

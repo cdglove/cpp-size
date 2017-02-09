@@ -29,7 +29,7 @@ private:
         ColSize,
         ColPercent,
         ColOrder,
-        ColOccurence
+        ColOccurence,
     };
 
 public:
@@ -46,7 +46,9 @@ public:
         : QTreeWidgetItem(parent)
         , size_(0)
         , order_(0)
-    {}
+    {
+        init();
+    }
 
     void setColumnFile(QString file)
     {
@@ -76,6 +78,12 @@ public:
         occurence_ = occurence;
         setText(ColOccurence, QString::number(occurence));
         setTextAlignment(ColOccurence, Qt::AlignRight);
+    }
+
+    void showCheckbox()
+    {
+        setFlags(flags() | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
+        setCheckState(ColFile, Qt::Checked);
     }
 
     IncludeTreeWidgetItem* parent()

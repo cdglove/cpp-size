@@ -119,8 +119,10 @@ private:
     struct filter_applier : tree_view_builder_base<filter_applier>
     {
         filter_applier(std::vector<bool>& keepers)
-            : keepers_(keepers)
-        {}
+            : tree_view_builder_base(tree_view_builder_base::option::none)
+            , keepers_(keepers)
+        {
+        }
 
         bool filter(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const&)
         {
