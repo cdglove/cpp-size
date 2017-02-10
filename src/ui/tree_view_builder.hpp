@@ -21,8 +21,11 @@
 // -----------------------------------------------------------------------------
 //
 template<typename Derived>
-struct tree_view_builder_base : cpp_dep::inferred_include_visitor<tree_view_builder_base<Derived>>
+class tree_view_builder_base 
+    : private cpp_dep::inferred_include_visitor<tree_view_builder_base<Derived>>
 {
+public:
+
     struct option
     {
         enum

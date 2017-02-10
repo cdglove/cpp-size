@@ -29,8 +29,8 @@ struct filtered_tree_view_builder
     void operator()(cpp_dep::include_graph_t const& g, QTreeWidget* root, FilterFunc&& filter_func)
     {
         std::vector<bool> keepers(boost::num_vertices(g), false);
-        filter_builder<VisitPolicy::Initial, std::decay_t<FilterFunc>> build(std::move(filter_func), keepers);
-        boost::depth_first_search(g, boost::visitor(build));
+        filter_builder<std::decay_t<FilterFunc>> build(std::move(filter_func), keepers);
+        build(g);
 
         filter_applier apply(keepers);
         apply(g, root);   
@@ -38,32 +38,27 @@ struct filtered_tree_view_builder
 
 private:
 
-    struct terminator {};
-    enum class VisitPolicy
+    template<typename FilterFunc>
+    struct filter_builder : cpp_dep::inferred_include_visitor<filter_builder<FilterFunc>>
     {
-        Initial,
-        Recursing,
-    };
 
-    template<VisitPolicy Policy, typename FilterFunc>
-    struct filter_builder : boost::default_dfs_visitor
-    {
+        void operator()(cpp_dep::include_graph_t const& g)
+        {
+            visit(g);
+        }
 
         filter_builder(FilterFunc filter_func, std::vector<bool>& keepers)
             : filter_func_(std::move(filter_func))
             , keepers_(keepers)
         {}
 
-        void start_vertex(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
+        void root_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
         {
             visited_.resize(boost::num_vertices(g), false);
-            if(v == 0 && is_recursing())
-                throw terminator();
-
             vertex_stack_.push_back(v);
         }
 
-        void discover_vertex(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
+        void include_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
         {
             visited_[v] = true;
 
@@ -84,30 +79,9 @@ private:
             vertex_stack_.push_back(v);
         }
 
-        void examine_edge(cpp_dep::include_edge_descriptor_t const& e, cpp_dep::include_graph_t const& g)
-        {
-            if(visited_[e.m_target] && !is_recursing())
-            {
-                try
-                {
-                    filter_builder<VisitPolicy::Recursing, FilterFunc> branch(filter_func_, keepers_);
-                    branch.vertex_stack_ = vertex_stack_;
-                    boost::depth_first_search(g, boost::visitor(branch).root_vertex(e.m_target));
-                }
-                catch(terminator)
-                {
-                }
-            }
-        }
-
-        void finish_vertex(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
+        void finish_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
         {
             vertex_stack_.pop_back();
-        }
-
-        bool is_recursing()
-        {
-            return Policy == VisitPolicy::Recursing;
         }
 
         FilterFunc filter_func_;
@@ -121,8 +95,7 @@ private:
         filter_applier(std::vector<bool>& keepers)
             : tree_view_builder_base(tree_view_builder_base::option::none)
             , keepers_(keepers)
-        {
-        }
+        {}
 
         bool filter(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const&)
         {
