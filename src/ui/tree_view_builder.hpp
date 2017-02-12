@@ -51,9 +51,15 @@ public:
 
 private:
 
+    // To be implemented by derived classes.
     bool filter(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
     {
         return true;
+    }
+
+    void item_created(cpp_dep::include_vertex_descriptor_t const& v, IncludeTreeWidgetItem* new_item)
+    {
+
     }
 
     friend class cpp_dep::inferred_include_visitor<tree_view_builder_base<Derived>>;
@@ -73,6 +79,8 @@ private:
         {
             current_item_->showCheckbox();
         }
+
+        derived().item_created(v, current_item_);
     }
 
     void include_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
@@ -82,6 +90,9 @@ private:
         cpp_dep::include_vertex_t const& file = g[v];
         
         std::size_t show_size = file.size + file.size_dependencies;
+        if(this->get_include_count(v) > 1)
+            show_size = 0;
+
         current_item_ = new IncludeTreeWidgetItem(current_item_);
         current_item_->setColumnFile(file.name.c_str());
         current_item_->setColumnSize(show_size, total_size_);
@@ -92,6 +103,8 @@ private:
         {
             current_item_->showCheckbox();
         }
+
+        derived().item_created(v, current_item_);
     }
 
     void finish_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)

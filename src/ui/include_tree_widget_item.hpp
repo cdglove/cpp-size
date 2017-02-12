@@ -21,23 +21,25 @@
 //
 class IncludeTreeWidgetItem : public QTreeWidgetItem 
 {
-private:
-
-    enum Col
-    {
-        ColFile,
-        ColSize,
-        ColPercent,
-        ColOrder,
-        ColOccurence,
-    };
-
 public:
+
+    struct Column
+    {
+        enum
+        {
+            File,
+            Size,
+            Percent,
+            Order,
+            Occurence,
+        };
+    };
 
     IncludeTreeWidgetItem(QTreeWidget* parent)
         : QTreeWidgetItem(parent)
         , size_(0)
         , order_(0)
+        , occurence_(0)
     {
         init();
     }
@@ -46,44 +48,56 @@ public:
         : QTreeWidgetItem(parent)
         , size_(0)
         , order_(0)
+        , occurence_(0)
     {
         init();
     }
 
     void setColumnFile(QString file)
     {
-        setText(ColFile, file);
+        setText(Column::File, file);
     }
 
     void setColumnOrder(int order)
     {
         order_ = order;
-        setText(ColOrder, QString::number(order));
-        setTextAlignment(ColOrder, Qt::AlignRight);
+        setText(Column::Order, QString::number(order));
     }
 
     void setColumnSize(qint64 size, qint64 total_size)
     {
         size_ = size;
-        setText(ColSize, QString::number((size+1023)/1024) + "kb");
+        setText(Column::Size, QString::number((size+1023)/1024) + "kb");
 
         qint64 this_size = total_size ? (size * 100) / total_size : 0;
-        setText(ColPercent, QString::number(this_size) + "%");
-        setTextAlignment(ColSize, Qt::AlignRight);
-        setTextAlignment(ColPercent, Qt::AlignRight);
+        setText(Column::Percent, QString::number(this_size) + "%");
+    }
+
+    qint64 getColumnSize() const
+    {
+        return size_;
     }
 
     void setColumnOccurence(int occurence)
     {
         occurence_ = occurence;
-        setText(ColOccurence, QString::number(occurence));
-        setTextAlignment(ColOccurence, Qt::AlignRight);
+        setText(Column::Occurence, QString::number(occurence));
+    }
+
+    int getColumnOccurence() const
+    {
+        return occurence_;
     }
 
     void showCheckbox()
     {
         setFlags(flags() | Qt::ItemIsUserCheckable | Qt::ItemIsSelectable);
-        setCheckState(ColFile, Qt::Checked);
+        setCheckState(Column::File, Qt::Checked);
+    }
+
+    bool isChecked() const
+    {
+        return checkState(Column::File) == Qt::Checked;
     }
 
     IncludeTreeWidgetItem* parent()
@@ -95,10 +109,10 @@ private:
 
     void init()
     {
-        setTextAlignment(ColSize, Qt::AlignRight);
-        setTextAlignment(ColPercent, Qt::AlignRight);
-        setTextAlignment(ColOrder, Qt::AlignRight);
-        setTextAlignment(ColOccurence, Qt::AlignRight);
+        setTextAlignment(Column::Size, Qt::AlignRight);
+        setTextAlignment(Column::Percent, Qt::AlignRight);
+        setTextAlignment(Column::Order, Qt::AlignRight);
+        setTextAlignment(Column::Occurence, Qt::AlignRight);
     }
 
     bool operator<(QTreeWidgetItem const& o) const override
@@ -108,15 +122,15 @@ private:
         int column = treeWidget()->sortColumn();
         switch(column)
         {
-        case ColFile:
-            return text(ColFile) < other.text(ColFile);
+        case Column::File:
+            return text(Column::File) < other.text(Column::File);
             break;
-        case ColSize:
-        case ColPercent:
+        case Column::Size:
+        case Column::Percent:
             return size_ < other.size_;
-        case ColOrder:
+        case Column::Order:
             return order_ < other.order_;
-        case ColOccurence:
+        case Column::Occurence:
             return occurence_ < other.occurence_;
         default:
             Q_ASSERT(false && "Invalid column");
