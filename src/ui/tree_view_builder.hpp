@@ -4,7 +4,7 @@
 //
 // Boost.Graph DFS visitor to construct a tree view from a boost graph.
 //
-// Copyright Chris Glover 2015
+// Copyright Chris Glover 2015-2017
 //
 // Distributed under the Boost Software License, Version 1.0.
 // See accompanying file LICENSE_1_0.txt or copy at
@@ -22,7 +22,7 @@
 //
 template<typename Derived>
 class tree_view_builder_base 
-    : private cpp_dep::inferred_include_visitor<tree_view_builder_base<Derived>>
+    : protected cpp_dep::inferred_include_visitor<tree_view_builder_base<Derived>>
 {
 public:
 
@@ -58,9 +58,7 @@ private:
     }
 
     void item_created(cpp_dep::include_vertex_descriptor_t const& v, IncludeTreeWidgetItem* new_item)
-    {
-
-    }
+    {}
 
     friend class cpp_dep::inferred_include_visitor<tree_view_builder_base<Derived>>;
 
@@ -71,9 +69,8 @@ private:
         total_size_ = file.size + file.size_dependencies;
         current_item_ = new IncludeTreeWidgetItem(root_);
         current_item_->setColumnFile(file.name.c_str());
-        current_item_->setColumnSize(total_size_, total_size_);
         current_item_->setColumnOrder(current_order_++);
-        current_item_->setColumnOccurence(this->get_include_count(v));
+        current_item_->setColumnOccurence(this->get_current_include_count(v));
 
         if(wants_checkboxes())
         {
@@ -85,19 +82,19 @@ private:
 
     void include_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
     {
-        if(!derived().filter(v, g))            return;
+        if(!derived().filter(v, g))
+            return;
 
         cpp_dep::include_vertex_t const& file = g[v];
         
         std::size_t show_size = file.size + file.size_dependencies;
-        if(this->get_include_count(v) > 1)
+        if(this->get_current_include_count(v) > 1)
             show_size = 0;
 
         current_item_ = new IncludeTreeWidgetItem(current_item_);
         current_item_->setColumnFile(file.name.c_str());
-        current_item_->setColumnSize(show_size, total_size_);
         current_item_->setColumnOrder(current_order_++);
-        current_item_->setColumnOccurence(this->get_include_count(v));
+        current_item_->setColumnOccurence(this->get_current_include_count(v));
 
         if(wants_checkboxes())
         {

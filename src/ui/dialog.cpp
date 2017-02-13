@@ -4,7 +4,7 @@
 //
 // Main dialog for cpp-size
 //
-// Copyright Chris Glover 2015
+// Copyright Chris Glover 2015-2017
 //
 // Distributed under the Boost Software License, Version 1.0.
 // See accompanying file LICENSE_1_0.txt or copy at
@@ -15,6 +15,7 @@
 #include "ui/include_tree_widget_item.hpp"
 #include "ui/tree_view_builder.hpp"
 #include "ui/filtered_tree_view_builder.hpp"
+#include "ui/tree_view_include_size_calculator.hpp"
 #include "ui_dialog.h"
 #include "cpp_dep/cpp_dep.hpp"
 #include <boost/graph/depth_first_search.hpp>
@@ -34,17 +35,20 @@
 //
 struct Dialog::include_tree_view_builder : tree_view_builder_base<include_tree_view_builder>
 {
-    include_tree_view_builder(include_item_database_t& destination_db)
+    include_tree_view_builder(std::vector<IncludeTreeWidgetItem*>& destination_items)
         : tree_view_builder_base(tree_view_builder_base::option::checkbox)
-        , db_(destination_db)
+        , item_list_(destination_items)
     {}
 
     void item_created(cpp_dep::include_vertex_descriptor_t const& v, IncludeTreeWidgetItem* new_item)
     {
-        db_.insert({v, new_item, new_item->getColumnOccurence()});
+        int current_idx = get_current_include_index();
+        if(item_list_.size() <= current_idx)
+            item_list_.resize(current_idx+1, nullptr);
+        item_list_[current_idx] = new_item;
     }
 
-    Dialog::include_item_database_t& db_;
+    std::vector<IncludeTreeWidgetItem*>& item_list_;
 };
 
 // -----------------------------------------------------------------------------
@@ -92,101 +96,21 @@ Dialog::~Dialog()
 //
 void Dialog::filterTextChanged(QString const& filter_text)
 {
-    //auto do_filter = [filter_text, this](QTreeWidget* tree)
-    //{
-    //    tree->clear();
-    //    std::vector<std::string> match_list;
-    //    std::string filter_text_std = filter_text.toStdString();
-    //    boost::algorithm::split(
-    //        match_list, filter_text_std,
-    //        boost::algorithm::is_any_of(" \0\t\r"),
-    //        boost::algorithm::token_compress_on);
 
-    //    match_list.erase(
-    //        std::remove_if(
-    //            match_list.begin(),
-    //            match_list.end(),
-    //            [](std::string const& s)
-    //            {
-    //                return s.empty();
-    //            }
-    //        ),
-    //        match_list.end()
-    //    );
-
-    //    if(match_list.empty())
-    //    {
-    //        tree_view_builder build_tree(tree_view_builder::option::checkbox);
-    //        build_tree(*include_graph_, tree);
-    //    }
-    //    else
-    //    {
-    //        auto match_all_substrings = [&match_list](
-    //            cpp_dep::include_vertex_descriptor_t const& v,
-    //            cpp_dep::include_graph_t const& g)
-    //        {
-    //            cpp_dep::include_vertex_t const& file = g[v];
-    //            return std::all_of(
-    //                match_list.begin(),
-    //                match_list.end(),
-    //                [&file](std::string const& sub_str)
-    //                {
-    //                    return file.name.find(sub_str) != std::string::npos;
-    //                }
-    //            );
-    //        };
-
-    //        filtered_tree_view_builder graph_filter;
-    //        graph_filter(*include_graph_, tree, match_all_substrings);
-    //    }
-
-    //    return tree;
-    //};
-
-    //if(include_graph_)
-    //    update_tree_widget_.run_or_enqueue(do_filter, new QTreeWidget);
 }
 
 // -----------------------------------------------------------------------------
 //
 void Dialog::includeTreeItemChanged(QTreeWidgetItem* changed_item_, int column)
 {
-    // cglover-todo: consider disconnecting the signal here instead.
     if(building_include_tree_)
         return;
 
     if(column != IncludeTreeWidgetItem::Column::File)
         return;
 
-    IncludeTreeWidgetItem* changed_item = static_cast<IncludeTreeWidgetItem*>(changed_item_);
-    include_item_database_t::index<by_item>::type& includes_by_item = include_item_db.template get<by_item>();
-    include_item_database_t::iterator include_item_node = includes_by_item.find(changed_item);
-    BOOST_ASSERT(include_item_node != includes_by_item.end());
-
-    cpp_dep::include_vertex_t const& root_file = (*include_graph_)[0];
-
-    qint64 size_to_add_up = -changed_item->getColumnSize();
-    qint64 total_size = root_file.size + root_file.size_dependencies;
-    if(changed_item->isChecked())
-    {
-        BOOST_ASSERT(size_to_add_up == 0);
-        cpp_dep::include_vertex_t const& file = (*include_graph_)[include_item_node->vert];
-        size_to_add_up = file.size + file.size_dependencies;
-
-        for_all_children(changed_item, set_to_original_size);
-    }
-    else
-    {
-        for_all_children(changed_item, [&](IncludeTreeWidgetItem* item)
-        {
-            item->setColumnSize(0, total_size);
-        });
-    }
-
-    for_all_ancestors(changed_item->parent(), [&](IncludeTreeWidgetItem* item)
-    {
-        item->setColumnSize(item->getColumnSize() + size_to_add_up, total_size);
-    });
+    tree_view_include_size_calculator calculate_sizes(all_include_tree_items_);
+    calculate_sizes(*include_graph_);
 }
 
 // -----------------------------------------------------------------------------
@@ -270,6 +194,7 @@ void Dialog::populateTrees()
     // both are empty instead of just one.
     ui->include_tree->clear();
     ui->filesystem_tree->clear();
+    all_include_tree_items_.clear();
 
     // Populate the include tree
     {
@@ -279,8 +204,11 @@ void Dialog::populateTrees()
         };
 
         building_include_tree_ = true;
-        include_tree_view_builder build_tree(include_item_db);
+        include_tree_view_builder build_tree(all_include_tree_items_);
         build_tree(*include_graph_, ui->include_tree);
+
+        tree_view_include_size_calculator calculate_sizes(all_include_tree_items_);
+        calculate_sizes(*include_graph_);
     }
 
     // Populate the filesystem tree
