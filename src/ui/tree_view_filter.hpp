@@ -45,7 +45,7 @@ private:
     {
         void operator()(cpp_dep::include_graph_t const& g)
         {
-            visit(g);
+            this->visit(g);
         }
 
         filter_builder(FilterFunc filter_func, std::size_t num_items)
@@ -55,21 +55,21 @@ private:
 
         void root_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
         {
-            index_stack_.push_back(get_current_include_index());
+            index_stack_.push_back(this->get_current_include_index());
         }
 
         void include_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
         {
             if(filter_func_(v, g))
             {
-                visible_by_index_[get_current_include_index()] = true;
+                visible_by_index_[this->get_current_include_index()] = true;
                 for(auto&& idx : index_stack_)
                 {
                     visible_by_index_[idx] = true;
                 }
             }
             
-            index_stack_.push_back(get_current_include_index());
+            index_stack_.push_back(this->get_current_include_index());
         }
 
         void finish_file(cpp_dep::include_vertex_descriptor_t const& v, cpp_dep::include_graph_t const& g)
